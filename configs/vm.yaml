@@ -1,0 +1,10 @@
+- name: num_cores_per_vcpu
+  help: Number of cores per virtual CPU.
+- name: memory_mb
+  help: Memory in MB.
+- name: num_vcpus
+  help: Number of virtual CPUs.
+- name: power_state
+  help: Power state of the VM.
+- name: vcpu_reservation_hz
+  help: vCPU reservation in Hz.

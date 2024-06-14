@@ -1,0 +1,4 @@
+- name: num_nodes
+  help: Number of nodes in the cluster.
+- name: data_reduction_compression_saved_bytes
+  help: Data reduction compression saved bytes.

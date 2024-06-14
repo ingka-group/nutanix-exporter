@@ -1,0 +1,82 @@
+name: Release CI
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.yml'
+
+jobs:
+  docker:
+    name: Build + Push Docker Image
+    runs-on: [ mgke-dev ]
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Determine version
+      id: create_version
+      uses: paulhatch/semantic-version@v5.4.0
+      with:
+        tag_prefix: 'v'
+        major_pattern: "(MAJOR)"
+        minor_pattern: "(MINOR)"
+        version_format: "${major}.${minor}.${patch}"
+        bump_each_commit: true
+        bump_each_commit_patch_pattern: "(PATCH)"
+
+    - name: Build Docker Image
+      run: |
+        docker build -t nutanix_exporter:${{ steps.create_version.outputs.version }} .
+
+    - name: Set up Artifactory CLI
+      uses: jfrog/setup-jfrog-cli@v3
+      if: success()
+      env:
+        JF_URL: "https://artifactory.build.ingka.ikea.com/"
+        JF_ACCESS_TOKEN: "${{ secrets.ARTIFACTORY_TOKEN }}"
+
+    - name: Set up IKEA Artifactory Registry
+      run: |
+        export SERVER_ID="IKEA_Artifactory"
+        export ACCESS_TOKEN="${{ secrets.ARTIFACTORY_TOKEN }}"
+        export URL="https://artifactory.build.ingka.ikea.com/"
+        jf c add $SERVER_ID --url=$URL --access-token=$ACCESS_TOKEN --interactive=false
+
+    - name: Push Docker Image to Artifactory
+      if: success()
+      run: |
+        IMAGE_NAME="nutanix_exporter"
+        VERSION="${{ steps.create_version.outputs.version }}"
+        ARTIFACTORY_URL="artifactory.build.ingka.ikea.com/distributedhostingcodecommunity-docker-dev-local/nutanix"
+        FULL_IMAGE_NAME="$ARTIFACTORY_URL/${IMAGE_NAME}"
+
+        # Tag the image with the specific version and 'latest'
+        docker tag ${IMAGE_NAME}:${VERSION} ${FULL_IMAGE_NAME}:${VERSION}
+        docker tag ${IMAGE_NAME}:${VERSION} ${FULL_IMAGE_NAME}:latest
+
+        # Push both tags to Artifactory
+        jf rt docker-push ${FULL_IMAGE_NAME}:${VERSION} distributedhostingcodecommunity-docker-dev-local
+        jf rt docker-push ${FULL_IMAGE_NAME}:latest distributedhostingcodecommunity-docker-dev-local
+      env:
+        JFROG_CLI_OFFER_CONFIG: "false"
+  
+    - name: Discard Old Builds in Artifactory
+      if: success() && steps.create_version.outputs.version != ''
+      run: |
+        jf rt bdi c --max-builds=1
+
+    - name: Create Release
+      if: success() && steps.create_version.outputs.version != ''
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.create_version.outputs.version }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
