@@ -27,5 +27,5 @@ require (
 	github.com/stretchr/testify v1.8.4 // indirect
 	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/time v0.0.0-20220922220347-f3bd1da661af // indirect
-	google.golang.org/protobuf v1.32.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 )
