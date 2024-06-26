@@ -1,0 +1,4 @@
+- name: storage_capacity_bytes
+  help: Total capacity of the storage container in bytes.
+- name: storage_usage_bytes
+  help: Total usage of the storage container in bytes.

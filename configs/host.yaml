@@ -1,0 +1,16 @@
+- name: num_vms
+  help: Number of VMs.
+- name: num_cpu_cores
+  help: Number of CPU cores.
+- name: num_cpu_sockets
+  help: Number of CPU sockets.
+- name: num_cpu_threads
+  help: Number of CPU threads.
+- name: cpu_frequency_in_hz
+  help: CPU frequency in Hz.
+- name: cpu_capacity_in_hz
+  help: CPU capacity in Hz.
+- name: memory_capacity_in_bytes
+  help: Memory capacity in bytes.
+- name: boot_time_in_usecs
+  help: Boot time in microseconds.
