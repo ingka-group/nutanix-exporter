@@ -1,4 +1,6 @@
 - name: num_nodes
   help: Number of nodes in the cluster.
-- name: data_reduction_compression_saved_bytes
-  help: Data reduction compression saved bytes.
+- name: stats_hypervisor_cpu_usage_ppm
+  help: Hypervisor CPU usage in parts per million.
+- name: stats_hypervisor_memory_usage_ppm
+  help: Hypervisor memory usage in parts per million.

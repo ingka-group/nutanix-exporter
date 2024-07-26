@@ -1,4 +1,32 @@
-- name: storage_capacity_bytes
+- name: on_disk_dedup
+  help: On disk deduplication, on or off_
+- name: compression_enabled
+  help: Compression enabled, on or off.
+- name: stats_controller_num_iops
+  help: Number of IOPS on the storage container's disk controller.
+- name: stats_controller_total_io_time_usecs
+  help: Total time spent on I/O operations in microseconds.
+- name: stats_controller_avg_io_latency_usecs
+  help: Average I/O latency in microseconds.
+- name: usage_stats_storage_capacity_bytes
   help: Total capacity of the storage container in bytes.
-- name: storage_usage_bytes
+- name: usage_stats_storage_usage_bytes
   help: Total usage of the storage container in bytes.
+- name: usage_stats_storage_logical_snapshot_usage_bytes
+  help: Total logical snapshot usage of the storage container in bytes.
+- name: usage_stats_storage_snapshot_reclaimable_bytes
+  help: Total reclaimable snapshot usage of the storage container in bytes.
+- name: usage_stats_data_reduction_overall_saving_ratio_ppm
+  help: Overall data reduction saving ratio in parts per million.
+- name: usage_stats_data_reduction_dedup_saving_ratio_ppm
+  help: Deduplication saving ratio in parts per million.
+- name: usage_stats_data_reduction_dedup_pre_reduction_bytes
+  help: Total bytes used before deduplication.
+- name: usage_stats_data_reduction_dedup_post_reduction_bytes
+  help: Total bytes used after deduplication.
+- name: usage_stats_data_reduction_compression_saving_ratio_ppm
+  help: Compression saving ratio in parts per million.
+- name: usage_stats_data_reduction_compression_pre_reduction_bytes
+  help: Total bytes used before compression.
+- name: usage_stats_data_reduction_compression_post_reduction_bytes
+  help: Total bytes used after compression.

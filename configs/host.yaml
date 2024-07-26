@@ -14,3 +14,17 @@
   help: Memory capacity in bytes.
 - name: boot_time_in_usecs
   help: Boot time in microseconds.
+- name: oplog_disk_pct
+  help: Usage percentage of the oplog disk.
+- name: stats_controller_num_iops
+  help: Number of IOPS on the hosts disk controller.
+- name: stats_hypervisor_cpu_usage_ppm
+  help: Hypervisor CPU usage in parts per million.
+- name: stats_num_iops
+  help: Number of IOPS on the host.
+- name: stats_avg_io_latency_usecs
+  help: Average I/O latency in microseconds.
+- name: usage_stats_storage_capacity_bytes
+  help: Total capacity of the host in bytes.
+- name: usage_stats_storage_free_bytes
+  help: Total free space of the host in bytes.
