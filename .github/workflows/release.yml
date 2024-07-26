@@ -89,7 +89,7 @@ jobs:
       if: success() && steps.create_version.outputs.version != ''
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ steps.create_version.outputs.version }}
+        tag_name: v${{ steps.create_version.outputs.version }}
         draft: false
         prerelease: false
       env:
