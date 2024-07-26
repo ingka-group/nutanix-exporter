@@ -27,7 +27,7 @@ COPY --from=build-stage /app/nutanix-exporter /
 # Copy configs
 COPY --from=build-stage /app/configs /configs
 
-LABEL description "Prometheus Exporter for Nutanix Prism Element"
+LABEL description="Prometheus Exporter for Nutanix Prism"
 
 USER nonroot:nonroot
 
