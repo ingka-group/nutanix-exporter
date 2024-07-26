@@ -64,7 +64,7 @@ func (e *Exporter) valueToFloat64(value interface{}) float64 {
 	case string:
 		if v == "on" {
 			return 1.0
-		} else if v == "off" {
+		} else if v == "off" || v == "OFF" {
 			return 0.0
 		} else if f, err := strconv.ParseFloat(v, 64); err == nil {
 			return f
@@ -75,7 +75,27 @@ func (e *Exporter) valueToFloat64(value interface{}) float64 {
 
 // normalizeKey normalizes given key to lowercase and replaces . and - with _
 func (e *Exporter) normalizeKey(key string) string {
-	return strings.ToLower(strings.NewReplacer(".", "_", "-", "_").Replace(key))
+	return strings.ToLower(strings.NewReplacer(".", "_", "-", "_", ":", "_").Replace(key))
+}
+
+// flattenMap flattens a nested map into a flat map with keys separated by underscores
+func (e *Exporter) flattenMap(prefix string, nestedMap map[string]interface{}) map[string]interface{} {
+
+	flatMap := make(map[string]interface{})
+	for key, value := range nestedMap {
+		flatKey := key
+		if prefix != "" {
+			flatKey = prefix + "_" + key
+		}
+		if nested, ok := value.(map[string]interface{}); ok {
+			for k, v := range e.flattenMap(flatKey, nested) {
+				flatMap[k] = v
+			}
+		} else {
+			flatMap[flatKey] = value
+		}
+	}
+	return flatMap
 }
 
 // Describe method required by prometheus.Collector interface
@@ -148,4 +168,26 @@ func (e *Exporter) initMetrics(configPath string, labelNames []string) error {
 	}
 
 	return nil
+}
+
+// updateMetrics processes the JSON structure for hosts and updates the metrics.
+func (e *Exporter) updateMetrics(data map[string]interface{}) {
+	// Iterate over the entities in the JSON structure
+	if entities, ok := data["entities"].([]interface{}); ok {
+		for _, entity := range entities {
+			if ent, ok := entity.(map[string]interface{}); ok {
+				// Flatten the entire entity and iterate over the flattened map
+				flatEntity := e.flattenMap("", ent)
+				for key, value := range flatEntity {
+					// Normalize the key and check if we're collecting this metric
+					normKey := e.normalizeKey(key)
+					if g, exists := e.Metrics[normKey]; exists {
+						// Set label values and update the metric
+						labelValues := []string{e.Cluster.Name, ent["name"].(string)}
+						g.WithLabelValues(labelValues...).Set(e.valueToFloat64(value))
+					}
+				}
+			}
+		}
+	}
 }
