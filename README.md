@@ -8,6 +8,7 @@ The Nutanix Exporter is a Go application that fetches live data from any number 
 
 - YAML config files define which metrics to collect
 - Hashicorp Vault support for fetching cluster credentials
+- Refreshes credentials from Vault on 4xx errors
 - Parent Exporter class that can be extended for any APIv2 endpoint
 - Per cluster metrics exposed at `/metrics/cluster-name`
 - Optional filtering by cluster name prefix
