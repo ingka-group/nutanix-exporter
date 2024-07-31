@@ -25,7 +25,16 @@ The Nutanix Exporter is a Go application that fetches live data from any number 
 
 ### Metrics Configuration
 
-`/config` contains a YAML configuration file for each exporter. This is where the metrics to be collected are defined. Any value in the API response can be collected; the exporter will walk the JSON response and collect values matching the metric keys defined in the configuration file.
+Metrics are collected from the Prism Element v2.0 APIs. Currently, the exporter supports the following endpoints:
+
+- Clusters
+- Hosts
+- VMs
+- Storage Containers
+
+The response from the API contains a list of entities, each with a set of key-value pairs. The exporter will flatten these key-value pairs and expose them as Prometheus metrics.
+
+`/config` contains a YAML configuration file for each exporter. This is where the metrics to be collected are defined. Any value in the API response can be collected; however, the exporter will only collect metrics that are defined in the configuration file.
 
 Each entry must have the following fields:
 
@@ -39,6 +48,8 @@ Each entry must have the following fields:
   help: Power state of the VM.
 - name: vcpu_reservation_hz
   help: vCPU reservation in Hz.
+- name: stats_num_iops
+  help: Number of IOPS. (Example of a nested key where stats is the parent in the response)
 ```
 
 Default configuration files are provided for each APIv2 endpoint. These can be overwritten when running the exporter by mounting a new configuration file into the container as seen in the deployment section.
