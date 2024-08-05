@@ -39,5 +39,3 @@ func main() {
 	stop()
 
 }
-
-// test
