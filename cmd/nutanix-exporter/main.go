@@ -38,6 +38,4 @@ func main() {
 	// Stop gracefully
 	stop()
 
-	// test comment
-
 }
