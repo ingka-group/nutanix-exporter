@@ -30,14 +30,10 @@ func main() {
 	// Initialize exporter
 	go exporter.Init()
 
-	// Wait for shutdown signal
+	// Wait for shutdown signal and stop gracefully
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	defer stop()
 	<-ctx.Done()
-
-	// Stop gracefully
 	stop()
-
-	// test comment
 
 }
