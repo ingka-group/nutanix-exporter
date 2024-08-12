@@ -7,6 +7,10 @@ on:
     paths-ignore:
       - '**/*.md'
       - '**/*.yml'
+      
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   docker:
@@ -32,16 +36,18 @@ jobs:
 
     - name: Set up Artifactory CLI
       uses: jfrog/setup-jfrog-cli@v4
+      id: login
       env:
         JF_URL: https://${{ secrets.JF_URL }}
-        JF_ACCESS_TOKEN: "${{ secrets.JF_TOKEN }}"
+      with:
+        oidc-provider-name: "ghec-ingka-group"
+        oidc-audience: "jfrog-github"
 
     - name: Set up Artifactory Server
       run: |
-        export SERVER_ID="Artifactory"
-        export ACCESS_TOKEN="${{ secrets.JF_TOKEN }}"
+        export SERVER_ID="Artifactory"        
         export URL=https://${{ secrets.JF_URL }}
-        jf c add $SERVER_ID --url=$URL --access-token=$ACCESS_TOKEN --interactive=false
+        jf c add $SERVER_ID --url=$URL --access-token=${{ steps.login.outputs.oidc-token }} --interactive=false
 
     - name: Build and Publish Go Package
       run: |
