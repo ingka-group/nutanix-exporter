@@ -36,4 +36,5 @@ func main() {
 	<-ctx.Done()
 	stop()
 
+	// test comment
 }
