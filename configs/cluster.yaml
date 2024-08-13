@@ -4,3 +4,7 @@
   help: Hypervisor CPU usage in parts per million.
 - name: stats_hypervisor_memory_usage_ppm
   help: Hypervisor memory usage in parts per million.
+- name: cluster_redundancy_state_current_redundancy_factor
+  help: Current redundancy factor of the cluster.
+- name: cluster_redundancy_state_desired_redundancy_factor
+  help: Desired redundancy factor of the cluster.

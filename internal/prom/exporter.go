@@ -172,22 +172,46 @@ func (e *Exporter) initMetrics(configPath string, labelNames []string) error {
 
 // updateMetrics processes the JSON structure for hosts and updates the metrics.
 func (e *Exporter) updateMetrics(data map[string]interface{}) {
-	// Iterate over the entities in the JSON structure
+	// Check if the "entities" key is present and is a list
 	if entities, ok := data["entities"].([]interface{}); ok {
+		// Process each entity in the list
 		for _, entity := range entities {
 			if ent, ok := entity.(map[string]interface{}); ok {
-				// Flatten the entire entity and iterate over the flattened map
-				flatEntity := e.flattenMap("", ent)
-				for key, value := range flatEntity {
-					// Normalize the key and check if we're collecting this metric
-					normKey := e.normalizeKey(key)
-					if g, exists := e.Metrics[normKey]; exists {
-						// Set label values and update the metric
-						labelValues := []string{e.Cluster.Name, ent["name"].(string)}
-						g.WithLabelValues(labelValues...).Set(e.valueToFloat64(value))
-					}
+				// Process the entity with appropriate label handling
+				e.processEntity(ent, false)
+			}
+		}
+	} else {
+		// No "entities" list, so treat the entire data as a single entity (Cluster level)
+		e.processEntity(data, true)
+	}
+}
+
+// processEntity handles the processing of a single entity (either a regular entity or the entire cluster)
+func (e *Exporter) processEntity(ent map[string]interface{}, isClusterLevel bool) {
+	// Flatten the entity map
+	flatEntity := e.flattenMap("", ent)
+
+	// Iterate over the flattened map and update the metrics
+	for key, value := range flatEntity {
+		// Normalize the key and check if we're collecting this metric
+		normKey := e.normalizeKey(key)
+		if g, exists := e.Metrics[normKey]; exists {
+			// Set label values and update the metric
+			var labelValues []string
+			if isClusterLevel {
+				// For cluster-level metrics, only use the cluster name
+				labelValues = []string{e.Cluster.Name}
+			} else {
+				// For entity-level metrics, use both cluster name and entity name
+				if name, ok := ent["name"].(string); ok {
+					labelValues = []string{e.Cluster.Name, name}
+				} else {
+					// Handle case where "name" is missing or not a string
+					labelValues = []string{e.Cluster.Name, "unknown"}
 				}
 			}
+			g.WithLabelValues(labelValues...).Set(e.valueToFloat64(value))
 		}
 	}
 }
