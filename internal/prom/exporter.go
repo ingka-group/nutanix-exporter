@@ -172,24 +172,30 @@ func (e *Exporter) initMetrics(configPath string, labelNames []string) error {
 
 // updateMetrics processes the JSON structure for hosts and updates the metrics.
 func (e *Exporter) updateMetrics(data map[string]interface{}) {
+	// Check if metadata exists and process it
+	if metadata, ok := data["metadata"].(map[string]interface{}); ok {
+		e.processMetadata(metadata)
+	}
+
 	// Check if the "entities" key is present and is a list
 	if entities, ok := data["entities"].([]interface{}); ok {
-		// Process each entity in the list
+		// Iterate over the list of entities and process each one
 		for _, entity := range entities {
 			if ent, ok := entity.(map[string]interface{}); ok {
-				// Process the entity with appropriate label handling
 				e.processEntity(ent, false)
 			}
 		}
 	} else {
-		// No "entities" list, so treat the entire data as a single entity (Cluster level)
+		// Cluster API is currently the only API that does not return a list of entities
+		// Subsequently, we process the entire cluster as a single entity
+		// isCluster flag removes the entity name from the labels
 		e.processEntity(data, true)
 	}
 }
 
 // processEntity handles the processing of a single entity (either a regular entity or the entire cluster)
-func (e *Exporter) processEntity(ent map[string]interface{}, isClusterLevel bool) {
-	// Flatten the entity map
+func (e *Exporter) processEntity(ent map[string]interface{}, isCluster bool) {
+	// Flatten the map (recursively) to get a flat map with nested keys separated by underscores
 	flatEntity := e.flattenMap("", ent)
 
 	// Iterate over the flattened map and update the metrics
@@ -199,11 +205,12 @@ func (e *Exporter) processEntity(ent map[string]interface{}, isClusterLevel bool
 		if g, exists := e.Metrics[normKey]; exists {
 			// Set label values and update the metric
 			var labelValues []string
-			if isClusterLevel {
-				// For cluster-level metrics, only use the cluster name
+
+			if isCluster {
+				// clustername is the only label for cluster-level metrics
 				labelValues = []string{e.Cluster.Name}
 			} else {
-				// For entity-level metrics, use both cluster name and entity name
+				// For entity-level metrics, use both cluster name and entity name as labels
 				if name, ok := ent["name"].(string); ok {
 					labelValues = []string{e.Cluster.Name, name}
 				} else {
@@ -212,6 +219,20 @@ func (e *Exporter) processEntity(ent map[string]interface{}, isClusterLevel bool
 				}
 			}
 			g.WithLabelValues(labelValues...).Set(e.valueToFloat64(value))
+		}
+	}
+}
+
+// processMetadata handles the processing of metadata for responses that contain an entity list
+func (e *Exporter) processMetadata(metadata map[string]interface{}) {
+	// Flatten the map (recursively) to get a flat map with nested keys separated by underscores
+	flatMetadata := e.flattenMap("", metadata)
+	for key, value := range flatMetadata {
+		// Normalize the key and check if we're collecting this metric
+		normKey := e.normalizeKey(key)
+		if g, exists := e.Metrics[normKey]; exists {
+			// Set label values and update the metric
+			g.WithLabelValues(e.Cluster.Name, "N/A").Set(e.valueToFloat64(value))
 		}
 	}
 }

@@ -8,3 +8,5 @@
   help: Power state of the VM.
 - name: vcpu_reservation_hz
   help: vCPU reservation in Hz.
+- name: grand_total_entities
+  help: Total number of VMs.
