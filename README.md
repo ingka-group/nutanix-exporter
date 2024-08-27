@@ -132,4 +132,4 @@ If you have any other issues or questions regarding this project, feel free to c
 
 ## Licence
 
-This project is open source under the "GPLv3 License", read the [LICENCE](./LICENCE.md) terms for more details.
+This project is open source under the "GPLv2 License", read the [LICENCE](./LICENCE.md) terms for more details.
