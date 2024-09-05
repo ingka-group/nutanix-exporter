@@ -34,7 +34,7 @@ Metrics are collected from the Prism Element v2.0 APIs. Currently, the exporter 
 
 The response from the API contains a list of entities, each with a set of key-value pairs. The exporter will flatten these key-value pairs and expose them as Prometheus metrics.
 
-`/config` contains a YAML configuration file for each exporter. This is where the metrics to be collected are defined. Any value in the API response can be collected; however, the exporter will only collect metrics that are defined in the configuration file.
+`/config` contains a YAML configuration file for each exporter. This is where the metrics to be collected are defined. Any value in the API response can be collected; however, the exporter will only collect metrics that are defined in the configuration file. It is important to note that nested fields in the API response are flattened and exposed like "parent_child", e.g. "stats_num_iops".
 
 Each entry must have the following fields:
 
@@ -56,7 +56,7 @@ Default configuration files are provided for each APIv2 endpoint. These can be o
 
 ## Running the Exporter
 
-While the exporter is designed to run in a containerized environment, it can also be run natively on a host. The following instructions will guide you through both methods. For production environments, the exporter should always be run in a container. However, for development and testing, running the exporter natively is generally easier.
+While the exporter is designed to run in a containerized environment, it can also be run natively on a host. The following instructions will guide you through both methods. For production environments, the exporter should always be run in a container. However, for development and testing, running the Go binary natively is generally easier.
 
 For both methods, start by cloning the repository and navigating to the repo root in your terminal.
 
