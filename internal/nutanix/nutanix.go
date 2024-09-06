@@ -181,6 +181,9 @@ func (c *PEClient) CreateRequest(ctx context.Context, reqType, action string, p 
 			return nil, fmt.Errorf("failed to marshal payload: %w", err)
 		}
 		req, err = http.NewRequestWithContext(ctx, reqType, fullURL, strings.NewReader(string(jsonPayload)))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
 		req.Header.Set("Content-Type", "application/json")
 	} else {
 		// Use the old method with body as string if no payload is provided
