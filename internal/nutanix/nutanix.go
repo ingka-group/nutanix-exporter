@@ -18,6 +18,7 @@ package nutanix
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -69,9 +70,10 @@ type PCClient struct {
 
 // RequestParams holds the components for a request (body, header, params)
 type RequestParams struct {
-	Body   string
-	Header string
-	Params url.Values
+	Body    string
+	Header  string
+	Params  url.Values
+	Payload interface{}
 }
 
 // NewCluster returns a new Nutanix cluster object, fetching credentials and creating an API client.
@@ -162,46 +164,73 @@ func (c *PCClient) RefreshCredentials(vaultClient *auth.VaultClient) error {
 	return nil
 }
 
-// CreateRequest takes context, request type, action and request parameters
-// Returns a new http request
-// Helper for making requests to Prism Element
+// CreateRequest takes context, request type, action, and request parameters
+// Returns a new HTTP request for PEClient
 func (c *PEClient) CreateRequest(ctx context.Context, reqType, action string, p RequestParams) (*http.Request, error) {
 	fullURL := fmt.Sprintf("%s/PrismGateway/services/rest/%s/", strings.Trim(c.URL, "/"), strings.Trim(action, "/"))
 
 	log.Printf("Sending request to %s", fullURL)
 
-	req, err := http.NewRequestWithContext(ctx, reqType, fullURL, strings.NewReader(p.Body))
+	var req *http.Request
+	var err error
+
+	// Check if the payload is not nil and marshal it to JSON if needed
+	if p.Payload != nil {
+		jsonPayload, err := json.Marshal(p.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal payload: %w", err)
+		}
+		req, err = http.NewRequestWithContext(ctx, reqType, fullURL, strings.NewReader(string(jsonPayload)))
+		req.Header.Set("Content-Type", "application/json")
+	} else {
+		// Use the old method with body as string if no payload is provided
+		req, err = http.NewRequestWithContext(ctx, reqType, fullURL, strings.NewReader(p.Body))
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(c.Username, c.Password)
-
 	return req, nil
 }
 
 // CreateRequest takes context, request type, action and request parameters
-// Returns a new http request
-// Helper for making requests to Prism Central
+// Returns a new http request for PCClient
 func (c *PCClient) CreateRequest(ctx context.Context, reqType, action string, p RequestParams) (*http.Request, error) {
 	fullURL := fmt.Sprintf("%s/%s", strings.Trim(c.URL, "/"), strings.Trim(action, "/"))
 
 	log.Printf("Sending request to %s", fullURL)
 
-	req, err := http.NewRequestWithContext(ctx, reqType, fullURL, strings.NewReader(p.Body))
+	var req *http.Request
+	var err error
+
+	// Check if the payload is not nil and marshal it to JSON if needed
+	if p.Payload != nil {
+		jsonPayload, err := json.Marshal(p.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal payload: %w", err)
+		}
+		req, err = http.NewRequestWithContext(ctx, reqType, fullURL, strings.NewReader(string(jsonPayload)))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+	} else {
+		// Use the old method with body as string if no payload is provided
+		req, err = http.NewRequestWithContext(ctx, reqType, fullURL, strings.NewReader(p.Body))
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(c.Username, c.Password)
-
 	return req, nil
 }
 
-// MakeRequestWithParams takes context, request type, action and request parameters
-// Returns a new http response
+// MakeRequestWithParams takes context, request type, action, and request parameters
+// Returns a new http response for PEClient
 func (c *PEClient) MakeRequestWithParams(ctx context.Context, reqType, action string, p RequestParams) (*http.Response, error) {
 	req, err := c.CreateRequest(ctx, reqType, action, p)
 	if err != nil {
@@ -246,14 +275,14 @@ func (c *PCClient) MakeRequestWithParams(ctx context.Context, reqType, action st
 	return resp, nil
 }
 
-// MakeRequest takes context, request type and action
+// MakeRequest takes context, request type, and action
 // Returns a new http response
 // Calls MakeRequestWithParams with empty RequestParams for PEClient
 func (c *PEClient) MakeRequest(ctx context.Context, reqType, action string) (*http.Response, error) {
 	return c.MakeRequestWithParams(ctx, reqType, action, RequestParams{})
 }
 
-// MakeRequest takes context, request type and action
+// MakeRequest takes context, request type, and action
 // Returns a new http response
 // Calls MakeRequestWithParams with empty RequestParams for PCClient
 func (c *PCClient) MakeRequest(ctx context.Context, reqType, action string) (*http.Response, error) {
