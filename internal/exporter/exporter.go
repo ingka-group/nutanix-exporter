@@ -39,6 +39,7 @@ const (
 
 var (
 	ClusterPrefix string
+	PCApiVersion  string
 	VaultClient   *auth.VaultClient
 	ClustersMap   map[string]*nutanix.Cluster
 )
@@ -48,6 +49,10 @@ func Init() {
 	// Get environment variables
 	PCClusterName := getEnvOrFatal("PC_CLUSTER_NAME")
 	PCClusterURL := getEnvOrFatal("PC_CLUSTER_URL")
+	PCApiVersion := os.Getenv("PC_API_VERSION") // Optional, defaults to v3
+	if PCApiVersion == "" {
+		PCApiVersion = "v4"
+	}
 	ClusterPrefix = os.Getenv("CLUSTER_PREFIX") // Optional
 
 	log.Printf("Initializing Vault client")
@@ -63,7 +68,7 @@ func Init() {
 	}
 
 	log.Printf("Initializing clusters")
-	clusterMap, err := SetupClusters(PCCluster, vaultClient)
+	clusterMap, err := SetupClusters(PCCluster, vaultClient, PCApiVersion)
 	if err != nil {
 		log.Fatalf("Failed to initialize clusters: %v", err)
 	}
@@ -84,8 +89,8 @@ func Init() {
 }
 
 // SetupClusters creates Prometheus collectors for every cluster registered in Prism Central
-func SetupClusters(prismClient *nutanix.Cluster, vaultClient *auth.VaultClient) (map[string]*nutanix.Cluster, error) {
-	clusterData, err := FetchClusters(prismClient)
+func SetupClusters(prismClient *nutanix.Cluster, vaultClient *auth.VaultClient, PCApiVersion string) (map[string]*nutanix.Cluster, error) {
+	clusterData, err := FetchClusters(prismClient, PCApiVersion)
 	if err != nil {
 		return nil, err // Propagate the error up
 	}
@@ -120,32 +125,135 @@ func SetupClusters(prismClient *nutanix.Cluster, vaultClient *auth.VaultClient) 
 }
 
 // FetchClusters fetches the name and IP of all Prism Element clusters registered in Prism Central.
-// Skips clusters that don't match the prefix if provided. (Env variable CLUSTER_PREFIX)
-func FetchClusters(prismClient *nutanix.Cluster) (map[string]string, error) {
+// Takes a version flag to switch between v3 and v4 API calls. Skips clusters that don't match the prefix if provided.
+func FetchClusters(prismClient *nutanix.Cluster, version string) (map[string]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	clusterData := make(map[string]string)
-	resp, err := prismClient.API.MakeRequest(ctx, "GET", "/api/clustermgmt/v4.0.b1/config/clusters")
+
+	// Define the functions for making requests and parsing for both v3 and v4.
+
+	// v4 request function
+	makeV4Request := func() (*http.Response, error) {
+		return prismClient.API.MakeRequest(ctx, "GET", "/api/clustermgmt/v4.0.b1/config/clusters")
+	}
+
+	// v3 request function
+	makeV3Request := func() (*http.Response, error) {
+		payload := map[string]interface{}{
+			"kind":   "cluster",
+			"length": 100, // Adjust as needed
+			"offset": 0,
+		}
+		return prismClient.API.MakeRequestWithParams(ctx, "POST", "/api/nutanix/v3/clusters/list", nutanix.RequestParams{
+			Payload: payload,
+		})
+	}
+
+	// v4 parsing function
+	parseV4Clusters := func(result map[string]interface{}) ([]map[string]string, error) {
+		data, ok := result["data"].([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected response format for v4")
+		}
+
+		var clusters []map[string]string
+		for _, cluster := range data {
+			clusterMap := cluster.(map[string]interface{})
+			name, nameOk := clusterMap["name"].(string)
+			if !nameOk || name == "Unnamed" {
+				continue
+			}
+			network, networkOk := clusterMap["network"].(map[string]interface{})["externalAddress"].(map[string]interface{})
+			if !networkOk {
+				continue
+			}
+			ip, ipOk := network["ipv4"].(map[string]interface{})["value"].(string)
+			if !ipOk {
+				continue
+			}
+
+			clusters = append(clusters, map[string]string{
+				"name": name,
+				"ip":   ip,
+			})
+		}
+		return clusters, nil
+	}
+
+	// v3 parsing function
+	parseV3Clusters := func(result map[string]interface{}) ([]map[string]string, error) {
+		entities, ok := result["entities"].([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected response format for v3")
+		}
+
+		var clusters []map[string]string
+		for _, entity := range entities {
+			cluster := entity.(map[string]interface{})
+			spec, specOk := cluster["spec"].(map[string]interface{})
+			status, statusOk := cluster["status"].(map[string]interface{})
+			if !specOk || !statusOk {
+				continue
+			}
+
+			name, nameOk := spec["name"].(string)
+			if !nameOk || name == "Unnamed" {
+				continue
+			}
+
+			network, networkOk := status["resources"].(map[string]interface{})["network"].(map[string]interface{})
+			if !networkOk {
+				continue
+			}
+
+			ip, ipOk := network["external_ip"].(string)
+			if !ipOk {
+				continue
+			}
+
+			clusters = append(clusters, map[string]string{
+				"name": name,
+				"ip":   ip,
+			})
+		}
+		return clusters, nil
+	}
+
+	// Decide which request and parsing functions to use based on the version
+	var resp *http.Response
+	var err error
+	var parseClusters func(map[string]interface{}) ([]map[string]string, error)
+
+	if version == "v3" {
+		resp, err = makeV3Request()
+		parseClusters = parseV3Clusters
+	} else {
+		resp, err = makeV4Request()
+		parseClusters = parseV4Clusters
+	}
+
 	if err != nil {
 		return nil, err // Return the error to be handled by the caller
 	}
 	defer resp.Body.Close()
 
+	// Parse the response
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 
-	// Loop through result.data and extract name and IP of each cluster
-	for _, cluster := range result["data"].([]interface{}) {
-		name := cluster.(map[string]interface{})["name"].(string)
-		ip := cluster.(map[string]interface{})["network"].(map[string]interface{})["externalAddress"].(map[string]interface{})["ipv4"].(map[string]interface{})["value"].(string)
+	clusters, err := parseClusters(result)
+	if err != nil {
+		return nil, err
+	}
 
-		// Skip the unnamed cluster
-		if name == "Unnamed" {
-			continue
-		}
+	// Build the final clusterData map
+	for _, cluster := range clusters {
+		name := cluster["name"]
+		ip := cluster["ip"]
 
 		// Skip clusters that don't match the prefix if provided
 		if ClusterPrefix != "" && !strings.HasPrefix(name, ClusterPrefix) {
