@@ -24,7 +24,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	"sync"
 
 	"github.com/ingka-group/nutanix-exporter/internal/auth"
 	"github.com/ingka-group/nutanix-exporter/internal/nutanix"
@@ -53,7 +52,7 @@ func Init() {
 	if PCApiVersion == "" {
 		PCApiVersion = "v4"
 	}
-	ClusterPrefix = os.Getenv("CLUSTER_PREFIX") // Optional
+	ClusterPrefix = os.Getenv("CLUSTER_PREFIX")  // Optional
 	RefreshPeriod := os.Getenv("REFRESH_PERIOD") // Optional, defaults to 5m
 	if RefreshPeriod == "" {
 		RefreshPeriod = "5m"
@@ -61,7 +60,7 @@ func Init() {
 	refreshDuration, err := time.ParseDuration(RefreshPeriod)
 	if err != nil {
 		log.Printf("Invalid refresh period: %v, defaulting to 5 minutes", err)
-		refreshDuration = 5 * time.Minute	
+		refreshDuration = 5 * time.Minute
 	}
 
 	log.Printf("Initializing Vault client")
@@ -81,6 +80,11 @@ func Init() {
 	if err != nil {
 		log.Fatalf("Failed to initialize clusters: %v", err)
 	}
+
+	updateHTTPHandlers(clusterMap, vaultClient)
+
+	log.Printf("Starting cluster refresh")
+	startClusterRefresh(PCCluster, vaultClient, PCApiVersion, refreshDuration)
 
 	log.Printf("Initializing HTTP server")
 	http.HandleFunc("/", indexHandler)
@@ -308,7 +312,7 @@ func startClusterRefresh(prismClient *nutanix.Cluster, vaultClient *auth.VaultCl
 	go func() {
 		for {
 			select {
-			case <- ticker.C:
+			case <-ticker.C:
 				log.Printf("Refreshing clusters")
 				clusterMap, err := SetupClusters(prismClient, vaultClient, PCApiVersion)
 				if err != nil {
@@ -323,6 +327,7 @@ func startClusterRefresh(prismClient *nutanix.Cluster, vaultClient *auth.VaultCl
 	}()
 }
 
+// updateHTTPHandlers updates handlers after cluster refresh
 func updateHTTPHandlers(clusterMap map[string]*nutanix.Cluster, vaultClient *auth.VaultClient) {
 	for name, cluster := range clusterMap {
 		route := fmt.Sprintf("/metrics%s", name)
