@@ -24,6 +24,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"sync"
 
 	"github.com/ingka-group/nutanix-exporter/internal/auth"
 	"github.com/ingka-group/nutanix-exporter/internal/nutanix"
@@ -42,6 +43,7 @@ var (
 	PCApiVersion  string
 	VaultClient   *auth.VaultClient
 	ClustersMap   map[string]*nutanix.Cluster
+	clustersMutex sync.Mutex
 )
 
 func Init() {
@@ -300,4 +302,37 @@ func getEnvOrFatal(envVar string) string {
 		log.Fatalf("%s environment variable is not set", envVar)
 	}
 	return value
+}
+
+// startClusterRefresh periodically checks for cluster changes in the Prism Central
+func startClusterRefresh(prismClient *nutanix.Cluster, vaultClient *auth.VaultClient, PCApiVersion string, refreshDuration time.Duration) {
+	ticker := time.NewTicker(refreshDuration)
+	go func() {
+		for {
+			select {
+			case <- ticker.C:
+				log.Printf("Refreshing clusters")
+				clusterMap, err := SetupClusters(prismClient, vaultClient, PCApiVersion)
+				if err != nil {
+					log.Printf("Failed to refresh clusters: %v", err)
+					continue
+				}
+
+				clustersMutex.Lock()
+				ClustersMap = clusterMap
+				updateHTTPHandlers(clusterMap, vaultClient)
+				clustersMutex.Unlock()
+
+				log.Printf("Clusters refreshed successfully")
+			}
+		}
+	}()
+}
+
+func updateHTTPHandlers(clusterMap map[string]*nutanix.Cluster, vaultClient *auth.VaultClient) {
+	for name, cluster := range clusterMap {
+		route := fmt.Sprintf("/metrics%s", name)
+		http.HandleFunc(route, createClusterMetricsHandler(cluster, vaultClient))
+		log.Printf("Registered metrics endpoint for cluster %s at %s", name, route)
+	}
 }
