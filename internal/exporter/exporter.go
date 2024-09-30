@@ -54,6 +54,15 @@ func Init() {
 		PCApiVersion = "v4"
 	}
 	ClusterPrefix = os.Getenv("CLUSTER_PREFIX") // Optional
+	RefreshPeriod := os.Getenv("REFRESH_PERIOD") // Optional, defaults to 5m
+	if RefreshPeriod == "" {
+		RefreshPeriod = "5m"
+	}
+	refreshDuration, err := time.ParseDuration(RefreshPeriod)
+	if err != nil {
+		log.Printf("Invalid refresh period: %v, defaulting to 5 minutes", err)
+		refreshDuration = 5 * time.Minute	
+	}
 
 	log.Printf("Initializing Vault client")
 	vaultClient, err := auth.NewVaultClient()
