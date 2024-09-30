@@ -42,8 +42,6 @@ var (
 	ClusterPrefix string
 	PCApiVersion  string
 	VaultClient   *auth.VaultClient
-	ClustersMap   map[string]*nutanix.Cluster
-	clustersMutex sync.Mutex
 )
 
 func Init() {
@@ -318,11 +316,7 @@ func startClusterRefresh(prismClient *nutanix.Cluster, vaultClient *auth.VaultCl
 					continue
 				}
 
-				clustersMutex.Lock()
-				ClustersMap = clusterMap
 				updateHTTPHandlers(clusterMap, vaultClient)
-				clustersMutex.Unlock()
-
 				log.Printf("Clusters refreshed successfully")
 			}
 		}
