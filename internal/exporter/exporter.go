@@ -38,9 +38,10 @@ const (
 )
 
 var (
-	ClusterPrefix string
-	PCApiVersion  string
-	VaultClient   *auth.VaultClient
+	ClusterPrefix    string
+	PCApiVersion     string
+	VaultClient      *auth.VaultClient
+	registeredRoutes = make(map[string]bool)
 )
 
 func Init() {
@@ -89,11 +90,12 @@ func Init() {
 	log.Printf("Initializing HTTP server")
 	http.HandleFunc("/", indexHandler)
 
-	for name, cluster := range clusterMap {
-		route := fmt.Sprintf("/metrics/%s", name)
-		http.HandleFunc(route, createClusterMetricsHandler(cluster, vaultClient))
-		log.Printf("Registered metrics endpoint for cluster %s at %s", name, route)
-	}
+	// Below code is redundant, as we are already registering the metrics endpoint for each cluster in the updateHTTPHandlers function
+	// for name, cluster := range clusterMap {
+	// 	route := fmt.Sprintf("/metrics/%s", name)
+	// 	http.HandleFunc(route, createClusterMetricsHandler(cluster, vaultClient))
+	// 	log.Printf("Registered metrics endpoint for cluster %s at %s", name, route)
+	// }
 
 	log.Printf("Starting Server on %s", ListenAddress)
 	if err := http.ListenAndServe(ListenAddress, nil); err != nil {
@@ -331,7 +333,10 @@ func startClusterRefresh(prismClient *nutanix.Cluster, vaultClient *auth.VaultCl
 func updateHTTPHandlers(clusterMap map[string]*nutanix.Cluster, vaultClient *auth.VaultClient) {
 	for name, cluster := range clusterMap {
 		route := fmt.Sprintf("/metrics%s", name)
-		http.HandleFunc(route, createClusterMetricsHandler(cluster, vaultClient))
-		log.Printf("Registered metrics endpoint for cluster %s at %s", name, route)
+		if !registeredRoutes[route] {
+			http.HandleFunc(route, createClusterMetricsHandler(cluster, vaultClient))
+			registeredRoutes[route] = true
+			log.Printf("Registered metrics endpoint for cluster %s at %s", name, route)
+		}
 	}
 }
