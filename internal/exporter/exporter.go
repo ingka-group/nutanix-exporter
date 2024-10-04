@@ -332,7 +332,7 @@ func startClusterRefresh(prismClient *nutanix.Cluster, vaultClient *auth.VaultCl
 // updateHTTPHandlers updates handlers after cluster refresh
 func updateHTTPHandlers(clusterMap map[string]*nutanix.Cluster, vaultClient *auth.VaultClient) {
 	for name, cluster := range clusterMap {
-		route := fmt.Sprintf("/metrics%s", name)
+		route := fmt.Sprintf("/metrics/%s", name)
 		if !registeredRoutes[route] {
 			http.HandleFunc(route, createClusterMetricsHandler(cluster, vaultClient))
 			registeredRoutes[route] = true
