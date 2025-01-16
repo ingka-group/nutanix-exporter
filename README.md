@@ -115,7 +115,7 @@ services:
 
 - [Go](https://golang.org/) - Programming language
 - [Go Prometheus Client](https://github.com/prometheus/client_golang) - Prometheus client library for Go
-- [Go Hashicorp Vault Client](github.com/hashicorp/vault-client-go) - Hashicorp Vault client library for Go
+- [Go Hashicorp Vault Client](https://github.com/hashicorp/vault-client-go) - Hashicorp Vault client library for Go
 - [Docker](https://www.docker.com/) - Containerization
 - [GitHub Actions](https://docs.github.com/en/actions) - CI/CD pipeline
 
