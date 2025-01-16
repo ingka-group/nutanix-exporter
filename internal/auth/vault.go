@@ -60,10 +60,10 @@ func NewVaultClient() (*VaultClient, error) {
 	addr := getEnvOrFatal("VAULT_ADDR")
 	roleId := getEnvOrFatal("VAULT_ROLE_ID")
 	secretId := getEnvOrFatal("VAULT_SECRET_ID")
-	namespace := getEnvOrFatal("VAULT_NAMESPACE")
 	PETaskAccount = getEnvOrFatal("PE_TASK_ACCOUNT")
 	PCTaskAccount = getEnvOrFatal("PC_TASK_ACCOUNT")
 	EngineName = getEnvOrFatal("VAULT_ENGINE_NAME")
+	namespace := os.Getenv("VAULT_NAMESPACE")
 
 	log.Printf("Creating new Vault client for %s", addr)
 	client, err := vault.New(
@@ -75,14 +75,28 @@ func NewVaultClient() (*VaultClient, error) {
 	}
 
 	log.Printf("Authenticating with Vault using AppRole")
-	resp, err := client.Auth.AppRoleLogin(
-		ctx,
-		schema.AppRoleLoginRequest{
-			RoleId:   roleId,
-			SecretId: secretId,
-		},
-		vault.WithNamespace(namespace),
-	)
+	var resp *vault.Response[map[string]interface{}]
+
+	if namespace != "" {
+
+		resp, err = client.Auth.AppRoleLogin(
+			ctx,
+			schema.AppRoleLoginRequest{
+				RoleId:   roleId,
+				SecretId: secretId,
+			},
+			vault.WithNamespace(namespace),
+		)
+	} else {
+		resp, err = client.Auth.AppRoleLogin(
+			ctx,
+			schema.AppRoleLoginRequest{
+				RoleId:   roleId,
+				SecretId: secretId,
+			},
+		)
+	}
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -92,8 +106,13 @@ func NewVaultClient() (*VaultClient, error) {
 		log.Fatal(err)
 	}
 
-	if err = client.SetNamespace(namespace); err != nil {
-		log.Fatal(err)
+	if namespace != "" {
+		log.Printf("Setting namespace to %s", namespace)
+		if err = client.SetNamespace(namespace); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		log.Printf("No namespace specified")
 	}
 
 	return &VaultClient{client: client}, nil
