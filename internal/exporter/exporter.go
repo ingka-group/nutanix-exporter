@@ -59,12 +59,12 @@ func Init() {
 	ClusterPrefix = os.Getenv("CLUSTER_PREFIX") // Optional
 
 	refreshIntervalStr := os.Getenv("CLUSTER_REFRESH_INTERVAL")
-+   refreshInterval := 0
-+	if refreshIntervalStr != "" {
-+  		if v, err := strconv.Atoi(refreshIntervalStr); err == nil && v > 0 {
-+       	refreshInterval = v
-+   	}
-+   }
+    refreshInterval := 0
+	if refreshIntervalStr != "" {
+   		if v, err := strconv.Atoi(refreshIntervalStr); err == nil && v > 0 {
+        	refreshInterval = v
+    	}
+ 	}
 
 	log.Printf("Initializing Vault client")
 	vaultClient, err := auth.NewVaultClient()
@@ -85,46 +85,45 @@ func Init() {
 		log.Fatalf("Failed to initialize clusters: %v", err)
 	}
 	clustersMu.Lock()
-+   ClustersMap = clusterMap
-+   clustersMu.Unlock()
-
-+   // Periodic refresh of clusters
-+   if refreshInterval > 0 {
-+   	go func() {
-+       	ticker := time.NewTicker(time.Duration(refreshInterval) * time.Second)
-+           defer ticker.Stop()
-+           i := 0
-+           for range ticker.C { // Every time the ticker ticks, i.e. every refreshInterval secs, do code below
-+           	i++
-+               log.Printf("Refreshing cluster list... %v", i)
-+               newMap, err := SetupClusters(PCCluster, vaultClient, PCApiVersion)
-+               if err != nil {
-+               	log.Printf("Cluster refresh failed: %v", err)
-+                   continue // Begin loop again, wait for next tick
-+               }
-+               clustersMu.Lock()
-+               ClustersMap = newMap
-+               clustersMu.Unlock()
-+               log.Printf("Cluster list refreshed")
-+           }
-+       }()
-+   }	
+    ClustersMap = clusterMap
+    clustersMu.Unlock()
+    // Periodic refresh of clusters
+    if refreshInterval > 0 {
+   		go func() {
+       	ticker := time.NewTicker(time.Duration(refreshInterval) * time.Second)
+        	defer ticker.Stop()
+            i := 0
+            for range ticker.C { // Every time the ticker ticks, i.e. every refreshInterval secs, do code below
+				i++
+                log.Printf("Refreshing cluster list... %v", i)
+                newMap, err := SetupClusters(PCCluster, vaultClient, PCApiVersion)
+                if err != nil {
+               		log.Printf("Cluster refresh failed: %v", err)
+                    continue // Begin loop again, wait for next tick
+                }
+                clustersMu.Lock()
+                ClustersMap = newMap
+                clustersMu.Unlock()
+                log.Printf("Cluster list refreshed")
+            }
+        }()
+    }	
 
 	log.Printf("Initializing HTTP server")
 	http.HandleFunc("/", indexHandler)
 
 	// Dynamically serve metrics for each cluster
-+   http.HandleFunc("/metrics/", func(w http.ResponseWriter, r *http.Request) {
-+   	name := strings.TrimPrefix(r.URL.Path, "/metrics/")
-+       clustersMu.RLock()
-+       cluster, ok := ClustersMap[name]
-+       clustersMu.RUnlock()
-+       if !ok {
-+       	http.NotFound(w, r)
-+           return
-+       }
-+       createClusterMetricsHandler(cluster, vaultClient)(w, r)
-+   })
+    http.HandleFunc("/metrics/", func(w http.ResponseWriter, r *http.Request) {
+   	name := strings.TrimPrefix(r.URL.Path, "/metrics/")
+        clustersMu.RLock()
+        cluster, ok := ClustersMap[name]
+        clustersMu.RUnlock()
+        if !ok {
+       		http.NotFound(w, r)
+            return
+        }
+        createClusterMetricsHandler(cluster, vaultClient)(w, r)
+    })
 
 	log.Printf("Starting Server on %s", ListenAddress)
 	if err := http.ListenAndServe(ListenAddress, nil); err != nil {
