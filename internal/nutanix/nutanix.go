@@ -80,18 +80,19 @@ type RequestParams struct {
 func NewCluster(name, url string, vaultClient *auth.VaultClient, isPC bool, skipTLSVerify bool, timeout time.Duration) *Cluster {
 	var api NutanixClient
 	var username, password string
+	var err error
 
 	if isPC {
-		username, password = vaultClient.GetPCCreds(name)
+		username, password, err = vaultClient.GetPCCreds(name)
 		if username == "" || password == "" {
-			log.Printf("Failed to get credentials for Prism Central %s", name)
+			log.Printf("Failed to get credentials for Prism Central %s: %v", name, err)
 			return nil
 		}
 		api = NewPCClient(url, username, password, skipTLSVerify, timeout)
 	} else {
-		username, password = vaultClient.GetPECreds(name)
+		username, password, err = vaultClient.GetPECreds(name)
 		if username == "" || password == "" {
-			log.Printf("Failed to get credentials for Prism Element %s", name)
+			log.Printf("Failed to get credentials for Prism Element %s: %v", name, err)
 			return nil
 		}
 		api = NewPEClient(url, username, password, skipTLSVerify, timeout)
@@ -144,9 +145,9 @@ func (c *Cluster) RefreshCredentialsIfNeeded(vaultClient *auth.VaultClient) {
 
 // RefreshCredentials refreshes the credentials for the PEClient
 func (c *PEClient) RefreshCredentials(vaultClient *auth.VaultClient) error {
-	username, password := vaultClient.GetPECreds(c.URL)
+	username, password, err := vaultClient.GetPECreds(c.URL)
 	if username == "" || password == "" {
-		return fmt.Errorf("failed to refresh credentials for PE client %s", c.URL)
+		return fmt.Errorf("failed to refresh credentials for PE client %s: %v", c.URL, err)
 	}
 	c.Username = username
 	c.Password = password
@@ -155,9 +156,9 @@ func (c *PEClient) RefreshCredentials(vaultClient *auth.VaultClient) error {
 
 // RefreshCredentials refreshes the credentials for the PCClient
 func (c *PCClient) RefreshCredentials(vaultClient *auth.VaultClient) error {
-	username, password := vaultClient.GetPCCreds(c.URL)
+	username, password, err := vaultClient.GetPCCreds(c.URL)
 	if username == "" || password == "" {
-		return fmt.Errorf("failed to refresh credentials for PC client %s", c.URL)
+		return fmt.Errorf("failed to refresh credentials for PC client %s: %v", c.URL, err)
 	}
 	c.Username = username
 	c.Password = password
