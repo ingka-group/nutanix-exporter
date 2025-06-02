@@ -113,11 +113,18 @@ func Init() {
 	log.Printf("Initializing HTTP server")
 	http.HandleFunc("/", indexHandler)
 
-	for name, cluster := range clusterMap {
-		route := fmt.Sprintf("/metrics/%s", name)
-		http.HandleFunc(route, createClusterMetricsHandler(cluster, vaultClient))
-		log.Printf("Registered metrics endpoint for cluster %s at %s", name, route)
-	}
+	// Dynamically serve metrics for each cluster
++   http.HandleFunc("/metrics/", func(w http.ResponseWriter, r *http.Request) {
++   	name := strings.TrimPrefix(r.URL.Path, "/metrics/")
++       clustersMu.RLock()
++       cluster, ok := ClustersMap[name]
++       clustersMu.RUnlock()
++       if !ok {
++       	http.NotFound(w, r)
++           return
++       }
++       createClusterMetricsHandler(cluster, vaultClient)(w, r)
++   })
 
 	log.Printf("Starting Server on %s", ListenAddress)
 	if err := http.ListenAndServe(ListenAddress, nil); err != nil {
