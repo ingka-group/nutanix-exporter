@@ -22,6 +22,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -54,6 +55,14 @@ func Init() {
 		PCApiVersion = "v4"
 	}
 	ClusterPrefix = os.Getenv("CLUSTER_PREFIX") // Optional
+
+	refreshIntervalStr := os.Getenv("CLUSTER_REFRESH_INTERVAL")
++   refreshInterval := 0
++	if refreshIntervalStr != "" {
++  		if v, err := strconv.Atoi(refreshIntervalStr); err == nil && v > 0 {
++       	refreshInterval = v
++   	}
++   }
 
 	log.Printf("Initializing Vault client")
 	vaultClient, err := auth.NewVaultClient()
