@@ -139,20 +139,22 @@ func (v *VaultClient) GetSecret(path, engine string) (string, error) {
 }
 
 // GetPCCreds returns the username and password for the specified Prism Central cluster
-func (v *VaultClient) GetPCCreds(cluster string) (string, string) {
+func (v *VaultClient) GetPCCreds(cluster string) (string, string, error) {
 	return v.GetCreds(cluster, PCTaskAccount, EngineName)
 }
 
 // GetPECreds returns the username and password for the specified Prism Element cluster
-func (v *VaultClient) GetPECreds(cluster string) (string, string) {
+func (v *VaultClient) GetPECreds(cluster string) (string, string, error) {
 	return v.GetCreds(cluster, PETaskAccount, EngineName)
 }
 
 // GetCreds returns the username and password for the specified cluster, path, and engine
-func (v *VaultClient) GetCreds(cluster, path, engine string) (string, string) {
+// Returns error if the credentials cannot be retrieved or parsed
+func (v *VaultClient) GetCreds(cluster, path, engine string) (string, string, error) {
 	secrets, err := v.GetSecret(fmt.Sprintf("%s/%s", cluster, path), engine)
 	if err != nil {
-		log.Fatalf("Failed to get secrets for %s: %v", cluster, err)
+		log.Printf("Warning: Failed to get secrets for %s: %v", cluster, err)
+		return "", "", err
 	}
 
 	var vaultSecret struct {
@@ -160,7 +162,8 @@ func (v *VaultClient) GetCreds(cluster, path, engine string) (string, string) {
 		Secret   string `json:"secret"`
 	}
 	if err := json.Unmarshal([]byte(secrets), &vaultSecret); err != nil {
-		log.Fatalf("Failed to parse secrets for %s: %v", cluster, err)
+		log.Printf("Warning: Failed to parse secrets for %s: %v", cluster, err)
+		return "", "", err
 	}
-	return vaultSecret.Username, vaultSecret.Secret
+	return vaultSecret.Username, vaultSecret.Secret, nil
 }
