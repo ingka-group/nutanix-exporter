@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"sync"
 
 	"github.com/ingka-group/nutanix-exporter/internal/auth"
 	"github.com/ingka-group/nutanix-exporter/internal/nutanix"
@@ -43,6 +44,7 @@ var (
 	PCApiVersion  string
 	VaultClient   *auth.VaultClient
 	ClustersMap   map[string]*nutanix.Cluster
+	clustersMu	  sync.RWMutex // Protects ClustersMap
 )
 
 func Init() {
@@ -76,11 +78,15 @@ func Init() {
 		log.Fatalf("Failed to connect to Prism Central cluster")
 	}
 
+	// Initial setup of cluster list
 	log.Printf("Initializing clusters")
 	clusterMap, err := SetupClusters(PCCluster, vaultClient, PCApiVersion)
 	if err != nil {
 		log.Fatalf("Failed to initialize clusters: %v", err)
 	}
+	clustersMu.Lock()
++   ClustersMap = clusterMap
++   clustersMu.Unlock()
 
 	log.Printf("Initializing HTTP server")
 	http.HandleFunc("/", indexHandler)
