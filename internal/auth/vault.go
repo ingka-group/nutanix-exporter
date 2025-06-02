@@ -106,6 +106,9 @@ func NewVaultClient() (*VaultClient, error) {
 		log.Fatal(err)
 	}
 
+	log.Printf("Token TTL: %d", resp.Auth.LeaseDuration)
+	log.Printf("Token Renewable: %v", resp.Auth.Renewable)
+
 	if namespace != "" {
 		log.Printf("Setting namespace to %s", namespace)
 		if err = client.SetNamespace(namespace); err != nil {
@@ -166,4 +169,15 @@ func (v *VaultClient) GetCreds(cluster, path, engine string) (string, string, er
 		return "", "", err
 	}
 	return vaultSecret.Username, vaultSecret.Secret, nil
+}
+
+func (v *VaultClient) RenewToken(ctx context.Context) error {
+	resp, err := v.client.Auth.TokenRenewSelf(ctx, schema.TokenRenewSelfRequest{})
+	if err != nil {
+		return err
+	}
+	if resp != nil && resp.Auth != nil {
+		log.Printf("Vault token renewed. New TTL: %d", resp.Auth.LeaseDuration)
+	}
+	return nil
 }
