@@ -42,7 +42,7 @@ const (
 var (
 	ClusterPrefix string
 	PCApiVersion  string
-	vaultClient   *auth.VaultClient
+	VaultClient   *auth.VaultClient
 	ClustersMap   map[string]*nutanix.Cluster
 	clustersMu    sync.RWMutex // Protects ClustersMap
 )
@@ -78,10 +78,10 @@ func Init() {
 			defer ticker.Stop()
 
 			for range ticker.C {
-				log.Printf("Re-initializing Vault client...")
+				log.Printf("Refreshing Vault client...")
 				vaultClient, err = auth.NewVaultClient()
 				if err != nil {
-					log.Fatalf("Failed to create Vault client: %v", err)
+					log.Fatalf("Failed to refresh Vault client: %v", err)
 				}
 			}
 		}()
@@ -186,7 +186,7 @@ func SetupClusters(prismClient *nutanix.Cluster, vaultClient *auth.VaultClient, 
 // FetchClusters fetches the name and IP of all Prism Element clusters registered in Prism Central.
 // Takes a version flag to switch between v3 and v4 API calls. Skips clusters that don't match the prefix if provided.
 func FetchClusters(prismClient *nutanix.Cluster, version string) (map[string]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	clusterData := make(map[string]string)
