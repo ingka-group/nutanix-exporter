@@ -186,7 +186,7 @@ func SetupClusters(prismClient *nutanix.Cluster, vaultClient *auth.VaultClient, 
 // FetchClusters fetches the name and IP of all Prism Element clusters registered in Prism Central.
 // Takes a version flag to switch between v3 and v4 API calls. Skips clusters that don't match the prefix if provided.
 func FetchClusters(prismClient *nutanix.Cluster, version string) (map[string]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	clusterData := make(map[string]string)
