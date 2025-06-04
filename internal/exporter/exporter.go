@@ -58,11 +58,19 @@ func Init() {
 	}
 	ClusterPrefix = os.Getenv("CLUSTER_PREFIX") // Optional
 
-	refreshIntervalStr := os.Getenv("CLUSTER_REFRESH_INTERVAL")
-	refreshInterval := 0
-	if refreshIntervalStr != "" {
-		if v, err := strconv.Atoi(refreshIntervalStr); err == nil && v > 0 {
-			refreshInterval = v
+	clusterRefreshIntervalStr := os.Getenv("CLUSTER_REFRESH_INTERVAL")
+	clusterRefreshInterval := 0
+	if clusterRefreshIntervalStr != "" {
+		if v, err := strconv.Atoi(clusterRefreshIntervalStr); err == nil && v > 0 {
+			clusterRefreshInterval = v
+		}
+	}
+
+	vaultRefreshIntervalStr := os.Getenv("VAULT_REFRESH_INTERVAL")
+	vaultRefreshInterval := 0
+	if vaultRefreshIntervalStr != "" {
+		if v, err := strconv.Atoi(vaultRefreshIntervalStr); err == nil && v > 0 {
+			vaultRefreshInterval = v
 		}
 	}
 
@@ -72,9 +80,10 @@ func Init() {
 		log.Fatalf("Failed to create Vault client: %v", err)
 	}
 
-	if refreshInterval > 0 {
+	// Periodic refresh of vault client
+	if vaultRefreshInterval > 0 {
 		go func() {
-			ticker := time.NewTicker(25 * time.Minute)
+			ticker := time.NewTicker(time.Duration(vaultRefreshInterval) * time.Second)
 			defer ticker.Stop()
 
 			for range ticker.C {
@@ -104,9 +113,9 @@ func Init() {
 	clustersMu.Unlock()
 
 	// Periodic refresh of clusters
-	if refreshInterval > 0 {
+	if clusterRefreshInterval > 0 {
 		go func() {
-			ticker := time.NewTicker(time.Duration(refreshInterval) * time.Second)
+			ticker := time.NewTicker(time.Duration(clusterRefreshInterval) * time.Second)
 			defer ticker.Stop()
 			i := 0
 			for range ticker.C { // Every time the ticker ticks, i.e. every refreshInterval secs, do code below
