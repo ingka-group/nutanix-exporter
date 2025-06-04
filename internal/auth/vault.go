@@ -106,9 +106,6 @@ func NewVaultClient() (*VaultClient, error) {
 		log.Fatal(err)
 	}
 
-	log.Printf("Token TTL: %d", resp.Auth.LeaseDuration)
-	log.Printf("Token Renewable: %v", resp.Auth.Renewable)
-
 	if namespace != "" {
 		log.Printf("Setting namespace to %s", namespace)
 		if err = client.SetNamespace(namespace); err != nil {

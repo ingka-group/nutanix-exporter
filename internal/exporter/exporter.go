@@ -128,7 +128,7 @@ func Init() {
 	log.Printf("Initializing HTTP server")
 	http.HandleFunc("/", indexHandler)
 
-	// Dynamically serve metrics for each cluster
+	// Dynamically create metrics-serving handler for incoming http request
 	http.HandleFunc("/metrics/", func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimPrefix(r.URL.Path, "/metrics/")
 		clustersMu.RLock()
