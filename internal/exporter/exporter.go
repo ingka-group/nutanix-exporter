@@ -74,7 +74,7 @@ func Init() {
 
 	if refreshInterval > 0 {
 		go func() {
-			ticker := time.NewTicker(15 * time.Minute)
+			ticker := time.NewTicker(25 * time.Minute)
 			defer ticker.Stop()
 
 			for range ticker.C {
