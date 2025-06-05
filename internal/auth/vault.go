@@ -168,13 +168,3 @@ func (v *VaultClient) GetCreds(cluster, path, engine string) (string, string, er
 	return vaultSecret.Username, vaultSecret.Secret, nil
 }
 
-func (v *VaultClient) RenewToken(ctx context.Context) error {
-	resp, err := v.client.Auth.TokenRenewSelf(ctx, schema.TokenRenewSelfRequest{})
-	if err != nil {
-		return err
-	}
-	if resp != nil && resp.Auth != nil {
-		log.Printf("Vault token renewed. New TTL: %d", resp.Auth.LeaseDuration)
-	}
-	return nil
-}
