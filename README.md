@@ -87,8 +87,11 @@ PC_CLUSTER_NAME=your-pc-cluster-name
 PC_CLUSTER_URL=https://your-pc-cluster.yourdomain.com:9440
 PE_TASK_ACCOUNT=PETaskAccount
 PC_TASK_ACCOUNT=PCTaskAccount
+CLUSTER_REFRESH_INTERVAL=1800 (Seconds. Optional, defaults to 0, i.e. no refreshing)
+VAULT_REFRESH_INTERVAL=1500 (Seconds. Optional, defaults to 0, i.e. no refreshing)
 CLUSTER_PREFIX=optional-cluster-prefix to filter cluster names
 PC_API_VERSION=v3 (Optional, defaults to v4. Supports v3, v4b1, v4)
+
 ```
 
 ## Deployment
