@@ -117,10 +117,8 @@ func Init() {
 		go func() {
 			ticker := time.NewTicker(time.Duration(clusterRefreshInterval) * time.Second)
 			defer ticker.Stop()
-			i := 0
 			for range ticker.C { // Every time the ticker ticks, i.e. every refreshInterval secs, exec code below
-				i++
-				log.Printf("Refreshing cluster list... %v", i)
+				log.Printf("Refreshing cluster list...")
 				newMap, err := SetupClusters(PCCluster, vaultClient, PCApiVersion)
 				if err != nil {
 					log.Printf("Cluster refresh failed: %v", err)
@@ -147,7 +145,7 @@ func Init() {
 			http.NotFound(w, r)
 			return
 		}
-		createClusterMetricsHandler(cluster, vaultClient)(w, r) // produce handler function for the incoming http request and execute it immediately 
+		createClusterMetricsHandler(cluster, vaultClient)(w, r) // produce handler function for the incoming http request and execute it immediately
 	})
 
 	log.Printf("Starting Server on %s", ListenAddress)
