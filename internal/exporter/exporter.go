@@ -40,11 +40,11 @@ const (
 )
 
 var (
-	ClusterPrefix string
-	PCApiVersion  string
-	VaultClient   *auth.VaultClient
-	ClustersMap   map[string]*nutanix.Cluster
-	clustersMu    sync.RWMutex // Protects ClustersMap
+	ClusterPrefix          string
+	PCApiVersion           string
+	ntnxCredentialProvider auth.CredentialProvider
+	ClustersMap            map[string]*nutanix.Cluster
+	clustersMu             sync.RWMutex // Protects ClustersMap
 )
 
 func Init() {
@@ -74,37 +74,45 @@ func Init() {
 		}
 	}
 
-	log.Printf("Initializing Vault client")
-	vaultClient, err := auth.NewVaultClient()
-	if err != nil {
-		log.Fatalf("Failed to create Vault client: %v", err)
-	}
+	if os.Getenv("VAULT_ADDR") != "" {
+		var err error
 
-	// Periodic refresh of vault client
-	if vaultRefreshInterval > 0 {
-		go func() {
-			ticker := time.NewTicker(time.Duration(vaultRefreshInterval) * time.Second)
-			defer ticker.Stop()
+		log.Printf("Initializing Vault client")
+		ntnxCredentialProvider, err = auth.NewVaultClient()
+		if err != nil {
+			log.Fatalf("Failed to create Vault client: %v", err)
+		}
 
-			for range ticker.C {
-				log.Printf("Refreshing Vault client...")
-				vaultClient, err = auth.NewVaultClient()
-				if err != nil {
-					log.Fatalf("Failed to refresh Vault client: %v", err)
+		// Periodic refresh of vault client
+		if vaultRefreshInterval > 0 {
+			go func() {
+				ticker := time.NewTicker(time.Duration(vaultRefreshInterval) * time.Second)
+				defer ticker.Stop()
+
+				for range ticker.C {
+					log.Printf("Refreshing Vault client...")
+					ntnxCredentialProvider, err = auth.NewVaultClient()
+					if err != nil {
+						log.Fatalf("Failed to refresh Vault client: %v", err)
+					}
 				}
-			}
-		}()
+			}()
+		}
+	} else if os.Getenv("PC_USERNAME") != "" {
+		ntnxCredentialProvider = &auth.EnvVarCredentialProvider{}
+	} else {
+		log.Fatal("No valid credential provider specified")
 	}
 
 	log.Printf("Connecting to Prism Central")
-	PCCluster := nutanix.NewCluster(PCClusterName, PCClusterURL, vaultClient, true, true, 10*time.Second)
+	PCCluster := nutanix.NewCluster(PCClusterName, PCClusterURL, ntnxCredentialProvider, true, true, 10*time.Second)
 	if PCCluster == nil {
 		log.Fatalf("Failed to connect to Prism Central cluster")
 	}
 
 	// Initial setup of cluster list
 	log.Printf("Initializing clusters")
-	clusterMap, err := SetupClusters(PCCluster, vaultClient, PCApiVersion)
+	clusterMap, err := SetupClusters(PCCluster, ntnxCredentialProvider, PCApiVersion)
 	if err != nil {
 		log.Fatalf("Failed to initialize clusters: %v", err)
 	}
@@ -119,7 +127,7 @@ func Init() {
 			defer ticker.Stop()
 			for range ticker.C { // Every time the ticker ticks, i.e. every refreshInterval secs, exec code below
 				log.Printf("Refreshing cluster list...")
-				newMap, err := SetupClusters(PCCluster, vaultClient, PCApiVersion)
+				newMap, err := SetupClusters(PCCluster, ntnxCredentialProvider, PCApiVersion)
 				if err != nil {
 					log.Printf("Cluster refresh failed: %v", err)
 					continue // wait for next tick and try again
@@ -145,7 +153,7 @@ func Init() {
 			http.NotFound(w, r)
 			return
 		}
-		createClusterMetricsHandler(cluster, vaultClient)(w, r) // produce handler function for the incoming http request and execute it immediately
+		createClusterMetricsHandler(cluster, ntnxCredentialProvider)(w, r) // produce handler function for the incoming http request and execute it immediately
 	})
 
 	log.Printf("Starting Server on %s", ListenAddress)
@@ -155,7 +163,7 @@ func Init() {
 }
 
 // SetupClusters creates Prometheus collectors for every cluster registered in Prism Central
-func SetupClusters(prismClient *nutanix.Cluster, vaultClient *auth.VaultClient, PCApiVersion string) (map[string]*nutanix.Cluster, error) {
+func SetupClusters(prismClient *nutanix.Cluster, ntnxCredentialProvider auth.CredentialProvider, PCApiVersion string) (map[string]*nutanix.Cluster, error) {
 	clusterData, err := FetchClusters(prismClient, PCApiVersion)
 	if err != nil {
 		return nil, err // Propagate the error up
@@ -163,7 +171,7 @@ func SetupClusters(prismClient *nutanix.Cluster, vaultClient *auth.VaultClient, 
 
 	clustersMap := make(map[string]*nutanix.Cluster)
 	for name, url := range clusterData {
-		cluster := nutanix.NewCluster(name, url, vaultClient, false, true, 10*time.Second)
+		cluster := nutanix.NewCluster(name, url, ntnxCredentialProvider, false, true, 10*time.Second)
 		if cluster == nil {
 			log.Printf("Failed to initialize cluster %s", name)
 			continue
@@ -346,10 +354,10 @@ func FetchClusters(prismClient *nutanix.Cluster, version string) (map[string]str
 }
 
 // createClusterMetricsHandler returns a http.HandlerFunc that serves metrics for a specific cluster
-func createClusterMetricsHandler(cluster *nutanix.Cluster, vaultClient *auth.VaultClient) http.HandlerFunc {
+func createClusterMetricsHandler(cluster *nutanix.Cluster, ntnxCredentialProvider auth.CredentialProvider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Refresh credentials for the specific cluster
-		cluster.RefreshCredentialsIfNeeded(vaultClient)
+		cluster.RefreshCredentialsIfNeeded(ntnxCredentialProvider)
 
 		// Serve metrics from the specific cluster's registry
 		promhttp.HandlerFor(cluster.Registry, promhttp.HandlerOpts{}).ServeHTTP(w, r)

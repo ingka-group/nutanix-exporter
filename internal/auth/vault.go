@@ -42,15 +42,6 @@ type VaultClient struct {
 	client *vault.Client
 }
 
-// getEnvOrFatal returns the value of the specified environment variable or exits the program
-func getEnvOrFatal(envVar string) string {
-	value := os.Getenv(envVar)
-	if value == "" {
-		log.Fatalf("%s environment variable is not set", envVar)
-	}
-	return value
-}
-
 // NewVaultClient creates a new Vault client and authenticates using AppRole
 // Uses the VAULT_ADDR, VAULT_ROLE_ID, VAULT_SECRET_ID and VAULT_NAMESPACE environment variables
 func NewVaultClient() (*VaultClient, error) {
@@ -167,4 +158,3 @@ func (v *VaultClient) GetCreds(cluster, path, engine string) (string, string, er
 	}
 	return vaultSecret.Username, vaultSecret.Secret, nil
 }
-

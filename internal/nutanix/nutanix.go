@@ -33,7 +33,7 @@ import (
 )
 
 type NutanixClient interface {
-	RefreshCredentials(vaultClient *auth.VaultClient) error
+	RefreshCredentials(ncp auth.CredentialProvider) error
 	CreateRequest(ctx context.Context, reqType, action string, p RequestParams) (*http.Request, error)
 	MakeRequestWithParams(ctx context.Context, reqType, action string, p RequestParams) (*http.Response, error)
 	MakeRequest(ctx context.Context, reqType, action string) (*http.Response, error)
@@ -77,20 +77,20 @@ type RequestParams struct {
 }
 
 // NewCluster returns a new Nutanix cluster object, fetching credentials and creating an API client.
-func NewCluster(name, url string, vaultClient *auth.VaultClient, isPC bool, skipTLSVerify bool, timeout time.Duration) *Cluster {
+func NewCluster(name, url string, ncp auth.CredentialProvider, isPC bool, skipTLSVerify bool, timeout time.Duration) *Cluster {
 	var api NutanixClient
 	var username, password string
 	var err error
 
 	if isPC {
-		username, password, err = vaultClient.GetPCCreds(name)
+		username, password, err = ncp.GetPCCreds(name)
 		if username == "" || password == "" {
 			log.Printf("Failed to get credentials for Prism Central %s: %v", name, err)
 			return nil
 		}
 		api = NewPCClient(url, username, password, skipTLSVerify, timeout)
 	} else {
-		username, password, err = vaultClient.GetPECreds(name)
+		username, password, err = ncp.GetPECreds(name)
 		if username == "" || password == "" {
 			log.Printf("Failed to get credentials for Prism Element %s: %v", name, err)
 			return nil
@@ -129,12 +129,12 @@ func NewPCClient(url, username, password string, skipTLSVerify bool, timeout tim
 }
 
 // Refreshes stale credentials using client methods
-func (c *Cluster) RefreshCredentialsIfNeeded(vaultClient *auth.VaultClient) {
+func (c *Cluster) RefreshCredentialsIfNeeded(ncp auth.CredentialProvider) {
 	c.Mutex.Lock()
 	defer c.Mutex.Unlock()
 
 	if c.RefreshNeeded {
-		if err := c.API.RefreshCredentials(vaultClient); err != nil {
+		if err := c.API.RefreshCredentials(ncp); err != nil {
 			log.Printf("Failed to refresh credentials for cluster %s: %v", c.Name, err)
 			return
 		}
@@ -144,8 +144,8 @@ func (c *Cluster) RefreshCredentialsIfNeeded(vaultClient *auth.VaultClient) {
 }
 
 // RefreshCredentials refreshes the credentials for the PEClient
-func (c *PEClient) RefreshCredentials(vaultClient *auth.VaultClient) error {
-	username, password, err := vaultClient.GetPECreds(c.URL)
+func (c *PEClient) RefreshCredentials(ncp auth.CredentialProvider) error {
+	username, password, err := ncp.GetPECreds(c.URL)
 	if username == "" || password == "" {
 		return fmt.Errorf("failed to refresh credentials for PE client %s: %v", c.URL, err)
 	}
@@ -155,8 +155,8 @@ func (c *PEClient) RefreshCredentials(vaultClient *auth.VaultClient) error {
 }
 
 // RefreshCredentials refreshes the credentials for the PCClient
-func (c *PCClient) RefreshCredentials(vaultClient *auth.VaultClient) error {
-	username, password, err := vaultClient.GetPCCreds(c.URL)
+func (c *PCClient) RefreshCredentials(ncp auth.CredentialProvider) error {
+	username, password, err := ncp.GetPCCreds(c.URL)
 	if username == "" || password == "" {
 		return fmt.Errorf("failed to refresh credentials for PC client %s: %v", c.URL, err)
 	}
