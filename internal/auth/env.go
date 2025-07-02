@@ -22,16 +22,16 @@ import (
 	"strings"
 )
 
-// EnvVarCredentialProvider implements the methods for getting Nutanix
+// EnvCredentialProvider implements the methods for getting Nutanix
 // cluster authentication credentials from environment variables.
-type EnvVarCredentialProvider struct{}
+type EnvCredentialProvider struct{}
 
 // ConvertClusterName changes any characters that should not be used in
 // environment variables to an underscore (_).
 func ConvertClusterName(cluster string) string {
 	cluster = strings.ToUpper(cluster)
 
-	r, _ := regexp.Compile("[^A-Z_0-9]+") // [^A-Za-z_0-9]+ global /g
+	r, _ := regexp.Compile("[^A-Z_0-9]+")
 	cluster = r.ReplaceAllString(cluster, "_")
 
 	return cluster
@@ -74,13 +74,13 @@ func getCreds(cluster string, isPC bool) (string, string, error) {
 }
 
 // GetPCCreds returns the username and password for the specified Prism Central cluster
-func (evCP *EnvVarCredentialProvider) GetPCCreds(cluster string) (string, string, error) {
+func (evCP *EnvCredentialProvider) GetPCCreds(cluster string) (string, string, error) {
 
 	return getCreds(cluster, true)
 }
 
 // GetPECreds returns the username and password for the specified Prism Element cluster
-func (evCP *EnvVarCredentialProvider) GetPECreds(cluster string) (string, string, error) {
+func (evCP *EnvCredentialProvider) GetPECreds(cluster string) (string, string, error) {
 
 	return getCreds(cluster, false)
 }
