@@ -99,6 +99,7 @@ func Init() {
 			}()
 		}
 	} else if os.Getenv("PC_USERNAME") != "" {
+		log.Print("Using the environment variable credential provider")
 		ntnxCredentialProvider = &auth.EnvCredentialProvider{}
 	} else {
 		log.Fatal("No valid credential provider specified")
