@@ -17,24 +17,58 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/ingka-group/nutanix-exporter/internal/exporter"
+	"github.com/ingka-group/nutanix-exporter/internal/auth"
+	"github.com/ingka-group/nutanix-exporter/internal/config"
+	"github.com/ingka-group/nutanix-exporter/internal/service"
 )
 
 // main is the entrypoint of the exporter
 func main() {
 
-	// Initialize exporter
-	go exporter.Init()
+	// Set up global structured Logging
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
 
-	// Wait for shutdown signal and stop gracefully
+	// Load configuration
+	cfg, err := config.NewConfig()
+	if err != nil {
+		slog.Error("Failed to load configuration", "error", err)
+		os.Exit(1)
+	}
+
+	// Create credential provider based on configuration
+	var credProvider auth.CredentialProvider
+	if cfg.VaultAddress != "" {
+		credProvider, err = auth.NewVaultCredentialProvider(cfg)
+		if err != nil {
+			slog.Error("Failed to create vault credential provider", "error", err)
+			os.Exit(1)
+		}
+		slog.Info("Using Vault credential provider")
+	} else {
+		credProvider = auth.NewEnvCredentialProvider()
+		slog.Info("Using environment variable credential provider")
+	}
+
+	// Create and start exporter service
+	exporterService := service.NewExporterService(cfg, credProvider)
+	if err := exporterService.Start(); err != nil {
+		slog.Error("Failed to start exporter service", "error", err)
+		os.Exit(1)
+	}
+
+	// Wait for shutdown signal
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	defer stop()
 	<-ctx.Done()
-	stop()
 
-	// test
+	// Stop services and disconnect clients
+	stop()
+	exporterService.Stop()
+	slog.Info("Graceful shutdown completed")
 }

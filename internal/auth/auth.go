@@ -22,23 +22,10 @@ limitations under the License.
 
 package auth
 
-import (
-	"log"
-	"os"
-)
-
 // CredentialProvider defines which functions a credential provider for Nutanix
 // cluster authentication has to implement.
 type CredentialProvider interface {
 	GetPCCreds(cluster string) (string, string, error)
 	GetPECreds(cluster string) (string, string, error)
-}
-
-// getEnvOrFatal returns the value of the specified environment variable or exits the program.
-func getEnvOrFatal(envVar string) string {
-	value := os.Getenv(envVar)
-	if value == "" {
-		log.Fatalf("%s environment variable is not set", envVar)
-	}
-	return value
+	Refresh() error // For refreshable providers like Vault
 }

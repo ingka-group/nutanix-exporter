@@ -20,7 +20,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -85,14 +85,14 @@ func NewCluster(name, url string, ncp auth.CredentialProvider, isPC bool, skipTL
 	if isPC {
 		username, password, err = ncp.GetPCCreds(name)
 		if username == "" || password == "" {
-			log.Printf("Failed to get credentials for Prism Central %s: %v", name, err)
+			slog.Error("Failed to get credentials for Prism Central", "name", name, "error", err)
 			return nil
 		}
 		api = NewPCClient(url, username, password, skipTLSVerify, timeout)
 	} else {
 		username, password, err = ncp.GetPECreds(name)
 		if username == "" || password == "" {
-			log.Printf("Failed to get credentials for Prism Element %s: %v", name, err)
+			slog.Error("Failed to get credentials for Prism Element", "name", name, "error", err)
 			return nil
 		}
 		api = NewPEClient(url, username, password, skipTLSVerify, timeout)
@@ -135,11 +135,11 @@ func (c *Cluster) RefreshCredentialsIfNeeded(ncp auth.CredentialProvider) {
 
 	if c.RefreshNeeded {
 		if err := c.API.RefreshCredentials(ncp); err != nil {
-			log.Printf("Failed to refresh credentials for cluster %s: %v", c.Name, err)
+			slog.Error("Failed to refresh credentials for cluster", "name", c.Name, "error", err)
 			return
 		}
 		c.RefreshNeeded = false // Reset the flag after refreshing
-		log.Printf("Credentials refreshed for cluster %s", c.Name)
+		slog.Info("Credentials refreshed for cluster", "name", c.Name)
 	}
 }
 
@@ -170,7 +170,7 @@ func (c *PCClient) RefreshCredentials(ncp auth.CredentialProvider) error {
 func (c *PEClient) CreateRequest(ctx context.Context, reqType, action string, p RequestParams) (*http.Request, error) {
 	fullURL := fmt.Sprintf("%s/PrismGateway/services/rest/%s/", strings.Trim(c.URL, "/"), strings.Trim(action, "/"))
 
-	log.Printf("Sending request to %s", fullURL)
+	slog.Info("Sending request to", "url", fullURL, "action", action, "reqType", reqType)
 
 	var req *http.Request
 	var err error
@@ -204,7 +204,7 @@ func (c *PEClient) CreateRequest(ctx context.Context, reqType, action string, p 
 func (c *PCClient) CreateRequest(ctx context.Context, reqType, action string, p RequestParams) (*http.Request, error) {
 	fullURL := fmt.Sprintf("%s/%s", strings.Trim(c.URL, "/"), strings.Trim(action, "/"))
 
-	log.Printf("Sending request to %s", fullURL)
+	slog.Info("Sending request to", "url", fullURL, "action", action, "reqType", reqType)
 
 	var req *http.Request
 	var err error

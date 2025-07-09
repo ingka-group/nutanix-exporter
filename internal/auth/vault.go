@@ -19,142 +19,117 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
-	"os"
+	"log/slog"
 	"time"
 
 	"github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
+	"github.com/ingka-group/nutanix-exporter/internal/config"
 )
 
-const (
-	Timeout = 30 * time.Second
-)
+const Timeout = 30 * time.Second
 
-var (
-	PCTaskAccount string
-	PETaskAccount string
-	EngineName    string
-)
-
-// VaultClient is a wrapper around the Vault client
-type VaultClient struct {
-	client *vault.Client
+type VaultCredentialProvider struct {
+	client        *vault.Client
+	config        *config.Config
+	pcTaskAccount string
+	peTaskAccount string
+	engineName    string
 }
 
-// NewVaultClient creates a new Vault client and authenticates using AppRole
-// Uses the VAULT_ADDR, VAULT_ROLE_ID, VAULT_SECRET_ID and VAULT_NAMESPACE environment variables
-func NewVaultClient() (*VaultClient, error) {
+// NewVaultCredentialProvider creates a new VaultCredentialProvider instance.
+func NewVaultCredentialProvider(cfg *config.Config) (*VaultCredentialProvider, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 
-	addr := getEnvOrFatal("VAULT_ADDR")
-	roleId := getEnvOrFatal("VAULT_ROLE_ID")
-	secretId := getEnvOrFatal("VAULT_SECRET_ID")
-	PETaskAccount = getEnvOrFatal("PE_TASK_ACCOUNT")
-	PCTaskAccount = getEnvOrFatal("PC_TASK_ACCOUNT")
-	EngineName = getEnvOrFatal("VAULT_ENGINE_NAME")
-	namespace := os.Getenv("VAULT_NAMESPACE")
-
-	log.Printf("Creating new Vault client for %s", addr)
 	client, err := vault.New(
-		vault.WithAddress(addr),
+		vault.WithAddress(cfg.VaultAddress),
 		vault.WithRequestTimeout(Timeout),
 	)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to create vault client: %w", err)
 	}
 
-	log.Printf("Authenticating with Vault using AppRole")
+	// Authenticate
+	loginRequest := schema.AppRoleLoginRequest{
+		RoleId:   cfg.VaultRoleId,
+		SecretId: cfg.VaultSecretId,
+	}
+
 	var resp *vault.Response[map[string]interface{}]
-
-	if namespace != "" {
-
-		resp, err = client.Auth.AppRoleLogin(
-			ctx,
-			schema.AppRoleLoginRequest{
-				RoleId:   roleId,
-				SecretId: secretId,
-			},
-			vault.WithNamespace(namespace),
-		)
+	if cfg.VaultNamespace != "" {
+		resp, err = client.Auth.AppRoleLogin(ctx, loginRequest, vault.WithNamespace(cfg.VaultNamespace))
 	} else {
-		resp, err = client.Auth.AppRoleLogin(
-			ctx,
-			schema.AppRoleLoginRequest{
-				RoleId:   roleId,
-				SecretId: secretId,
-			},
-		)
+		resp, err = client.Auth.AppRoleLogin(ctx, loginRequest)
 	}
 
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to authenticate with vault: %w", err)
 	}
 
-	log.Printf("Setting token for Vault client")
 	if err := client.SetToken(resp.Auth.ClientToken); err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to set vault token: %w", err)
 	}
 
-	if namespace != "" {
-		log.Printf("Setting namespace to %s", namespace)
-		if err = client.SetNamespace(namespace); err != nil {
-			log.Fatal(err)
+	if cfg.VaultNamespace != "" {
+		if err = client.SetNamespace(cfg.VaultNamespace); err != nil {
+			return nil, fmt.Errorf("failed to set vault namespace: %w", err)
 		}
-	} else {
-		log.Printf("No namespace specified")
 	}
 
-	return &VaultClient{client: client}, nil
+	return &VaultCredentialProvider{
+		client:        client,
+		config:        cfg,
+		pcTaskAccount: cfg.PCTaskAccount,
+		peTaskAccount: cfg.PETaskAccount,
+		engineName:    cfg.VaultEngineName,
+	}, nil
 }
 
-// GetSecret reads a secret from Vault using KV V2 secrets engine
-func (v *VaultClient) GetSecret(path, engine string) (string, error) {
+// Refresh refreshes the Vault client by creating a new instance with the same configuration.
+func (v *VaultCredentialProvider) Refresh() error {
+	newProvider, err := NewVaultCredentialProvider(v.config)
+	if err != nil {
+		return fmt.Errorf("failed to refresh vault client: %w", err)
+	}
+
+	v.client = newProvider.client
+	slog.Info("Vault client refreshed successfully")
+	return nil
+}
+
+// GetPCCreds retrieves the credentials for a given cluster.
+func (v *VaultCredentialProvider) GetPCCreds(cluster string) (string, string, error) {
+	return v.getCreds(cluster, v.pcTaskAccount, v.engineName)
+}
+
+// GetPECreds retrieves the credentials for a given cluster.
+func (v *VaultCredentialProvider) GetPECreds(cluster string) (string, string, error) {
+	return v.getCreds(cluster, v.peTaskAccount, v.engineName)
+}
+
+// GetCreds retrieves the credentials for a given cluster, path, and engine.
+func (v *VaultCredentialProvider) getCreds(cluster, path, engine string) (string, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 
-	// Read the secret from the specified path using KV V2
-	vaultResponse, err := v.client.Secrets.KvV2Read(ctx, path, vault.WithMountPath(engine))
+	vaultResponse, err := v.client.Secrets.KvV2Read(ctx, fmt.Sprintf("%s/%s", cluster, path), vault.WithMountPath(engine))
 	if err != nil {
-		return "", err
+		return "", "", fmt.Errorf("failed to read secret: %w", err)
 	}
 
-	// Marshal the secret data into JSON
 	jsonData, err := json.Marshal(vaultResponse.Data.Data)
 	if err != nil {
-		return "", fmt.Errorf("error marshalling secret data to JSON: %s", err)
-	}
-
-	return string(jsonData), nil
-}
-
-// GetPCCreds returns the username and password for the specified Prism Central cluster
-func (v *VaultClient) GetPCCreds(cluster string) (string, string, error) {
-	return v.GetCreds(cluster, PCTaskAccount, EngineName)
-}
-
-// GetPECreds returns the username and password for the specified Prism Element cluster
-func (v *VaultClient) GetPECreds(cluster string) (string, string, error) {
-	return v.GetCreds(cluster, PETaskAccount, EngineName)
-}
-
-// GetCreds returns the username and password for the specified cluster, path, and engine
-// Returns error if the credentials cannot be retrieved or parsed
-func (v *VaultClient) GetCreds(cluster, path, engine string) (string, string, error) {
-	secrets, err := v.GetSecret(fmt.Sprintf("%s/%s", cluster, path), engine)
-	if err != nil {
-		log.Printf("Warning: Failed to get secrets for %s: %v", cluster, err)
-		return "", "", err
+		return "", "", fmt.Errorf("failed to marshal secret data: %w", err)
 	}
 
 	var vaultSecret struct {
 		Username string `json:"username"`
 		Secret   string `json:"secret"`
 	}
-	if err := json.Unmarshal([]byte(secrets), &vaultSecret); err != nil {
-		log.Printf("Warning: Failed to parse secrets for %s: %v", cluster, err)
-		return "", "", err
+	if err := json.Unmarshal(jsonData, &vaultSecret); err != nil {
+		return "", "", fmt.Errorf("failed to parse secret data: %w", err)
 	}
+
 	return vaultSecret.Username, vaultSecret.Secret, nil
 }

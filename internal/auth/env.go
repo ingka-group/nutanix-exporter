@@ -26,39 +26,33 @@ import (
 // cluster authentication credentials from environment variables.
 type EnvCredentialProvider struct{}
 
-// ConvertClusterName changes any characters that should not be used in
-// environment variables to an underscore (_).
-func ConvertClusterName(cluster string) string {
-	cluster = strings.ToUpper(cluster)
+// NewEnvCredentialProvider creates a new instance of EnvCredentialProvider.
+func NewEnvCredentialProvider() *EnvCredentialProvider {
+	return &EnvCredentialProvider{}
+}
 
-	r, _ := regexp.Compile("[^A-Z_0-9]+")
-	cluster = r.ReplaceAllString(cluster, "_")
-
-	return cluster
+// Refresh is a no-op for the EnvCredentialProvider since it does not maintain a state.
+func (e *EnvCredentialProvider) Refresh() error {
+	return nil
 }
 
 // getEnvVarsForCluster generates the names for the environment variables
 // that have to be used for providing login credentials of a Nutanix cluster.
-func getEnvVarsForCluster(cluster string, isPC bool) (string, string) {
-	var evU, evP string
-
+func (e *EnvCredentialProvider) getEnvVarsForCluster(cluster string, isPC bool) (string, string) {
 	if isPC {
-		evU = "PC_USERNAME"
-		evP = "PC_PASSWORD"
-	} else {
-		evU = "PE_USERNAME_" + ConvertClusterName(cluster)
-		evP = "PE_PASSWORD_" + ConvertClusterName(cluster)
+		return "PC_USERNAME", "PC_PASSWORD"
 	}
 
-	return evU, evP
+	convertedCluster := e.convertClusterName(cluster)
+	return "PE_USERNAME_" + convertedCluster, "PE_PASSWORD_" + convertedCluster
 }
 
 // getCreds reads the appropriate environment variables and returns the username and password
 // for the provided cluster name.
 //
 // If isPC is true the credentials for Prism Central will be returned, otherwise those for Prism Element.
-func getCreds(cluster string, isPC bool) (string, string, error) {
-	evU, evP := getEnvVarsForCluster(cluster, isPC)
+func (e *EnvCredentialProvider) getCreds(cluster string, isPC bool) (string, string, error) {
+	evU, evP := e.getEnvVarsForCluster(cluster, isPC)
 
 	username := os.Getenv(evU)
 	if username == "" {
@@ -73,14 +67,19 @@ func getCreds(cluster string, isPC bool) (string, string, error) {
 	return username, password, nil
 }
 
-// GetPCCreds returns the username and password for the specified Prism Central cluster
-func (evCP *EnvCredentialProvider) GetPCCreds(cluster string) (string, string, error) {
-
-	return getCreds(cluster, true)
+// GetPCCreds retrieves the username and password for a given cluster from environment variables.
+func (e *EnvCredentialProvider) GetPCCreds(cluster string) (string, string, error) {
+	return e.getCreds(cluster, true)
 }
 
-// GetPECreds returns the username and password for the specified Prism Element cluster
-func (evCP *EnvCredentialProvider) GetPECreds(cluster string) (string, string, error) {
+// GetPECreds retrieves the username and password for a given cluster from environment variables.
+func (e *EnvCredentialProvider) GetPECreds(cluster string) (string, string, error) {
+	return e.getCreds(cluster, false)
+}
 
-	return getCreds(cluster, false)
+// convertClusterName converts the cluster name to uppercase and replaces non-alphanumeric characters with underscores.
+func (e *EnvCredentialProvider) convertClusterName(cluster string) string {
+	cluster = strings.ToUpper(cluster)
+	r, _ := regexp.Compile("[^A-Z_0-9]+")
+	return r.ReplaceAllString(cluster, "_")
 }

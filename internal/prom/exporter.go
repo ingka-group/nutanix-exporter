@@ -19,7 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"os"
 	"path/filepath"
@@ -127,7 +127,7 @@ func (e *Exporter) fetchData(ctx context.Context, path string) (map[string]inter
 	if resp.StatusCode == 403 || resp.StatusCode == 401 {
 		e.Cluster.Mutex.Lock()
 		if !e.Cluster.RefreshNeeded {
-			log.Printf("Marking stale credentials for refresh for cluster %s", e.Cluster.Name)
+			slog.Warn("Marking stale credentials for refresh", "cluster", e.Cluster.Name)
 			e.Cluster.RefreshNeeded = true
 		}
 		e.Cluster.Mutex.Unlock()
@@ -138,7 +138,7 @@ func (e *Exporter) fetchData(ctx context.Context, path string) (map[string]inter
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Printf("Error decoding response body: %v\n", err)
+		slog.Error("Error decoding response body", "error", err)
 		return nil, err
 	}
 

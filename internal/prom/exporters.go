@@ -17,8 +17,9 @@ package prom
 
 import (
 	"context"
-	"log"
 	"time"
+
+	"log/slog"
 
 	"github.com/ingka-group/nutanix-exporter/internal/nutanix"
 
@@ -90,7 +91,7 @@ func (e *StorageContainerExporter) Collect(ch chan<- prometheus.Metric) {
 
 	result, err := e.fetchData(ctx, "/v2.0/storage_containers/")
 	if err != nil {
-		log.Printf("Error fetching storage container data: %v", err)
+		slog.Error("Error fetching storage container data", "error", err)
 		return
 	}
 
@@ -108,7 +109,7 @@ func (e *ClusterExporter) Collect(ch chan<- prometheus.Metric) {
 
 	result, err := e.fetchData(ctx, "/v2.0/cluster/")
 	if err != nil {
-		log.Printf("Error fetching cluster data: %v", err)
+		slog.Error("Error fetching cluster data", "error", err)
 		return
 	}
 
@@ -126,7 +127,7 @@ func (e *HostsExporter) Collect(ch chan<- prometheus.Metric) {
 
 	result, err := e.fetchData(ctx, "/v2.0/hosts/")
 	if err != nil {
-		log.Printf("Error fetching host data: %v", err)
+		slog.Error("Error fetching host data", "error", err)
 		return
 	}
 
@@ -144,7 +145,7 @@ func (e *VmExporter) Collect(ch chan<- prometheus.Metric) {
 
 	result, err := e.fetchData(ctx, "/v2.0/vms/")
 	if err != nil {
-		log.Printf("Error fetching VM data: %v", err)
+		slog.Error("Error fetching VM data", "error", err)
 		return
 	}
 
