@@ -91,6 +91,7 @@ PC_CLUSTER_URL=https://your-pc-cluster.yourdomain.com:9440
 PC_API_VERSION=v3 (Optional, defaults to v4. Supports v3, v4b1, v4)
 CLUSTER_REFRESH_INTERVAL=1800 (Seconds. Optional, defaults to 30 minutes)
 CLUSTER_PREFIX=optional-cluster-prefix to filter cluster names
+CONFIG_PATH=/etc/prometheus-nutanix-exporter/ (Optional, defaults to './configs')
 
 ### For HashiCorp Vault only
 VAULT_ADDR=https://your-vault-server.yourdomain.com
