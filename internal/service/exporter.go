@@ -168,10 +168,10 @@ func (es *ExporterService) refreshClusters() error {
 		// Register collectors for this cluster
 		slog.Info("Registering collectors for cluster", "name", name)
 		collectors := []prometheus.Collector{
-			prom.NewStorageContainerCollector(cluster, "configs/storage_container.yaml"),
-			prom.NewClusterCollector(cluster, "configs/cluster.yaml"),
-			prom.NewHostCollector(cluster, "configs/host.yaml"),
-			prom.NewVMCollector(cluster, "configs/vm.yaml"),
+			prom.NewStorageContainerCollector(cluster, es.config.ConfigPath + "/storage_container.yaml"),
+			prom.NewClusterCollector(cluster, es.config.ConfigPath + "/cluster.yaml"),
+			prom.NewHostCollector(cluster, es.config.ConfigPath + "/host.yaml"),
+			prom.NewVMCollector(cluster, es.config.ConfigPath + "/vm.yaml"),
 		}
 
 		for _, collector := range collectors {

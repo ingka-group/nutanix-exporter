@@ -20,6 +20,7 @@ type Config struct {
 	VaultRefreshInterval   time.Duration `env:"VAULT_REFRESH_INTERVAL" envDefault:"30m"`
 	PETaskAccount          string        `env:"PE_TASK_ACCOUNT"`
 	PCTaskAccount          string        `env:"PC_TASK_ACCOUNT"`
+	ConfigPath             string        `env:"CONFIG_PATH" envDefault:"./configs"`
 }
 
 func NewConfig() (*Config, error) {
