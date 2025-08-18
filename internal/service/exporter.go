@@ -198,124 +198,185 @@ func (es *ExporterService) fetchClusters() (map[string]string, error) {
 
 	clusterData := make(map[string]string)
 
-	// Try different API versions in order of preference
-	var resp *http.Response
-	var err error
-	var parseClusters func(map[string]interface{}) ([]map[string]string, error)
-
+	// Determine API version
 	apiVersion := es.config.PCAPIVersion
-	if apiVersion == "" {
-		apiVersion = "v4" // Default to v4
-	}
 
 	slog.Info("Fetching clusters", "api_version", apiVersion)
 
+	// Select appropriate request and parse functions based on API version
+	var makeRequest func(context.Context, int) (*http.Response, error)
+	var parseClusters func(map[string]interface{}) ([]map[string]string, int, error)
+
 	switch apiVersion {
 	case "v3":
-		resp, err = es.makeV3Request(ctx)
+		makeRequest = es.makeV3Request
 		parseClusters = es.parseV3Clusters
 	case "v4b1":
-		resp, err = es.makeV4b1Request(ctx)
+		makeRequest = es.makeV4b1Request
 		parseClusters = es.parseV4Clusters
 	default: // v4
-		resp, err = es.makeV4Request(ctx)
+		makeRequest = es.makeV4Request
 		parseClusters = es.parseV4Clusters
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to make API request: %w", err)
-	}
-	defer resp.Body.Close()
+	// Paginate through all results
+	page := 0
+	totalExpected := 0
+	totalFetched := 0
 
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
+	for {
+		slog.Info("Fetching clusters page", "page", page)
 
-	clusters, err := parseClusters(result)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse clusters: %w", err)
-	}
-
-	// Build the final clusterData map
-	for _, cluster := range clusters {
-		name := cluster["name"]
-		ip := cluster["ip"]
-
-		// Skip clusters that don't match the prefix if provided
-		if es.config.ClusterPrefix != "" && !strings.HasPrefix(name, es.config.ClusterPrefix) {
-			slog.Info("Skipping cluster due to prefix filter", "name", name, "prefix", es.config.ClusterPrefix)
-			continue
+		resp, err := makeRequest(ctx, page)
+		if err != nil {
+			return nil, fmt.Errorf("failed to make API request for page %d: %w", page, err)
 		}
 
-		clusterData[name] = fmt.Sprintf("https://%s:9440", ip)
-		slog.Info("Found cluster", "name", name, "url", clusterData[name])
+		var result map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("failed to decode response for page %d: %w", page, err)
+		}
+		resp.Body.Close()
+
+		clusters, total, err := parseClusters(result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse clusters for page %d: %w", page, err)
+		}
+
+		// Set total expected on first page
+		if page == 0 {
+			totalExpected = total
+			slog.Info("Total clusters available", "total", totalExpected)
+		}
+
+		// Process clusters from this page
+		pageClusterCount := 0
+		duplicateCount := 0
+		for _, cluster := range clusters {
+			name := cluster["name"]
+			ip := cluster["ip"]
+
+			// Skip clusters that don't match the prefix if provided
+			if es.config.ClusterPrefix != "" && !strings.HasPrefix(name, es.config.ClusterPrefix) {
+				slog.Info("Skipping cluster due to prefix filter", "name", name, "prefix", es.config.ClusterPrefix)
+				continue
+			}
+
+			// Check if we've already seen this cluster (handles duplicate results)
+			if _, exists := clusterData[name]; exists {
+				duplicateCount++
+				slog.Info("Skipping duplicate cluster", "name", name)
+				continue
+			}
+
+			clusterData[name] = fmt.Sprintf("https://%s:9440", ip)
+			slog.Info("Found cluster", "name", name, "url", clusterData[name])
+			pageClusterCount++
+		}
+
+		totalFetched += len(clusters)
+
+		slog.Info("Processed clusters from page",
+			"page", page,
+			"clusters_on_page", len(clusters),
+			"new_clusters", pageClusterCount,
+			"duplicates", duplicateCount,
+			"total_fetched", totalFetched,
+			"total_unique", len(clusterData))
+
+		// If all clusters on this page were duplicates, we're done
+		if duplicateCount == len(clusters) && len(clusters) > 0 {
+			slog.Info("All clusters on page were duplicates, stopping pagination", "page", page)
+			break
+		}
+
+		// Check if we've fetched enough pages based on the limit
+		// For v4 API: if we got less than 100 results, this is the last page
+		if len(clusters) < 100 {
+			slog.Info("Received partial page, stopping pagination",
+				"page", page,
+				"clusters_on_page", len(clusters))
+			break
+		}
+
+		// Move to next page
+		page++
+
+		// Safety check to prevent infinite loops
+		if page > 100 {
+			slog.Warn("Reached maximum page limit, stopping pagination", "max_pages", 100)
+			break
+		}
 	}
 
+	slog.Info("Completed fetching all clusters",
+		"total_api_reported", totalExpected,
+		"total_clusters_fetched", totalFetched,
+		"total_unique_clusters", len(clusterData))
 	return clusterData, nil
 }
 
 // API request methods
-func (es *ExporterService) makeV3Request(ctx context.Context) (*http.Response, error) {
+func (es *ExporterService) makeV3Request(ctx context.Context, page int) (*http.Response, error) {
 	payload := map[string]interface{}{
 		"kind":   "cluster",
 		"length": 100,
-		"offset": 0,
+		"offset": page * 100,
 	}
 	return es.pcCluster.API.MakeRequestWithParams(ctx, "POST", "/api/nutanix/v3/clusters/list", nutanix.RequestParams{
 		Payload: payload,
 	})
 }
 
-func (es *ExporterService) makeV4Request(ctx context.Context) (*http.Response, error) {
+func (es *ExporterService) makeV4Request(ctx context.Context, page int) (*http.Response, error) {
 	return es.pcCluster.API.MakeRequestWithParams(ctx, "GET", "/api/clustermgmt/v4.0/config/clusters", nutanix.RequestParams{
-		Params: url.Values{"limit": []string{"100"}},
+		Params: url.Values{
+			"$limit":   []string{"100"},
+			"$page":    []string{fmt.Sprintf("%d", page)},
+			"$orderby": []string{"name"},
+		},
 	})
 }
 
-func (es *ExporterService) makeV4b1Request(ctx context.Context) (*http.Response, error) {
+func (es *ExporterService) makeV4b1Request(ctx context.Context, page int) (*http.Response, error) {
 	return es.pcCluster.API.MakeRequestWithParams(ctx, "GET", "/api/clustermgmt/v4.0.b1/config/clusters", nutanix.RequestParams{
-		Params: url.Values{"limit": []string{"100"}},
+		Params: url.Values{
+			"$limit":   []string{"100"},
+			"$page":    []string{fmt.Sprintf("%d", page)},
+			"$orderby": []string{"name"},
+		},
 	})
 }
 
-// Parsing methods
-func (es *ExporterService) parseV3Clusters(result map[string]interface{}) ([]map[string]string, error) {
+// Parsing methods with metadata extraction
+func (es *ExporterService) parseV3Clusters(result map[string]interface{}) ([]map[string]string, int, error) {
 	entities, ok := result["entities"].([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("unexpected v3 response format: missing 'entities' field")
+		return nil, 0, fmt.Errorf("unexpected v3 response format: missing 'entities' field")
 	}
 
+	// Extract total count from metadata
+	metadata := result["metadata"].(map[string]interface{})
+	totalCount := int(metadata["total_matches"].(float64))
+
 	var clusters []map[string]string
+	unnamedCount := 0
 	for _, entity := range entities {
-		cluster, ok := entity.(map[string]interface{})
-		if !ok {
+		cluster := entity.(map[string]interface{})
+		spec := cluster["spec"].(map[string]interface{})
+		status := cluster["status"].(map[string]interface{})
+
+		name, ok := spec["name"].(string)
+		if !ok || name == "" || name == "Unnamed" {
+			unnamedCount++
 			continue
 		}
 
-		spec, specOk := cluster["spec"].(map[string]interface{})
-		status, statusOk := cluster["status"].(map[string]interface{})
-		if !specOk || !statusOk {
-			continue
-		}
-
-		name, nameOk := spec["name"].(string)
-		if !nameOk || name == "" || name == "Unnamed" {
-			continue
-		}
-
-		resources, resourcesOk := status["resources"].(map[string]interface{})
-		if !resourcesOk {
-			continue
-		}
-
-		network, networkOk := resources["network"].(map[string]interface{})
-		if !networkOk {
-			continue
-		}
-
-		ip, ipOk := network["external_ip"].(string)
-		if !ipOk || ip == "" {
+		resources := status["resources"].(map[string]interface{})
+		network := resources["network"].(map[string]interface{})
+		ip, ok := network["external_ip"].(string)
+		if !ok || ip == "" {
 			continue
 		}
 
@@ -325,24 +386,28 @@ func (es *ExporterService) parseV3Clusters(result map[string]interface{}) ([]map
 		})
 	}
 
-	return clusters, nil
+	// Adjust total count to exclude unnamed clusters
+	return clusters, totalCount - unnamedCount, nil
 }
 
-func (es *ExporterService) parseV4Clusters(result map[string]interface{}) ([]map[string]string, error) {
+func (es *ExporterService) parseV4Clusters(result map[string]interface{}) ([]map[string]string, int, error) {
 	data, ok := result["data"].([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("unexpected v4 response format: missing 'data' field")
+		return nil, 0, fmt.Errorf("unexpected v4 response format: missing 'data' field")
 	}
 
-	var clusters []map[string]string
-	for _, item := range data {
-		clusterMap, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
+	// Extract total count from metadata
+	metadata := result["metadata"].(map[string]interface{})
+	totalCount := int(metadata["totalAvailableResults"].(float64))
 
-		name, nameOk := clusterMap["name"].(string)
-		if !nameOk || name == "" || name == "Unnamed" {
+	var clusters []map[string]string
+	unnamedCount := 0
+	for _, item := range data {
+		clusterMap := item.(map[string]interface{})
+
+		name, ok := clusterMap["name"].(string)
+		if !ok || name == "" || name == "Unnamed" {
+			unnamedCount++
 			continue
 		}
 
@@ -362,8 +427,8 @@ func (es *ExporterService) parseV4Clusters(result map[string]interface{}) ([]map
 			continue
 		}
 
-		ip, ipOk := ipv4["value"].(string)
-		if !ipOk || ip == "" {
+		ip, ok := ipv4["value"].(string)
+		if !ok || ip == "" {
 			continue
 		}
 
@@ -373,7 +438,8 @@ func (es *ExporterService) parseV4Clusters(result map[string]interface{}) ([]map
 		})
 	}
 
-	return clusters, nil
+	// Adjust total count to exclude unnamed clusters
+	return clusters, totalCount - unnamedCount, nil
 }
 
 func (es *ExporterService) setupHTTPHandlers() {
