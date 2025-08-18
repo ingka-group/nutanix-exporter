@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -168,10 +169,10 @@ func (es *ExporterService) refreshClusters() error {
 		// Register collectors for this cluster
 		slog.Info("Registering collectors for cluster", "name", name)
 		collectors := []prometheus.Collector{
-			prom.NewStorageContainerCollector(cluster, es.config.ConfigPath + "/storage_container.yaml"),
-			prom.NewClusterCollector(cluster, es.config.ConfigPath + "/cluster.yaml"),
-			prom.NewHostCollector(cluster, es.config.ConfigPath + "/host.yaml"),
-			prom.NewVMCollector(cluster, es.config.ConfigPath + "/vm.yaml"),
+			prom.NewStorageContainerCollector(cluster, es.config.ConfigPath+"/storage_container.yaml"),
+			prom.NewClusterCollector(cluster, es.config.ConfigPath+"/cluster.yaml"),
+			prom.NewHostCollector(cluster, es.config.ConfigPath+"/host.yaml"),
+			prom.NewVMCollector(cluster, es.config.ConfigPath+"/vm.yaml"),
 		}
 
 		for _, collector := range collectors {
@@ -267,11 +268,15 @@ func (es *ExporterService) makeV3Request(ctx context.Context) (*http.Response, e
 }
 
 func (es *ExporterService) makeV4Request(ctx context.Context) (*http.Response, error) {
-	return es.pcCluster.API.MakeRequest(ctx, "GET", "/api/clustermgmt/v4.0/config/clusters")
+	return es.pcCluster.API.MakeRequestWithParams(ctx, "GET", "/api/clustermgmt/v4.0/config/clusters", nutanix.RequestParams{
+		Params: url.Values{"limit": []string{"100"}},
+	})
 }
 
 func (es *ExporterService) makeV4b1Request(ctx context.Context) (*http.Response, error) {
-	return es.pcCluster.API.MakeRequest(ctx, "GET", "/api/clustermgmt/v4.0.b1/config/clusters")
+	return es.pcCluster.API.MakeRequestWithParams(ctx, "GET", "/api/clustermgmt/v4.0.b1/config/clusters", nutanix.RequestParams{
+		Params: url.Values{"limit": []string{"100"}},
+	})
 }
 
 // Parsing methods
