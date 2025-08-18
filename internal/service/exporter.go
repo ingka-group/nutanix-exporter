@@ -304,8 +304,8 @@ func (es *ExporterService) fetchClusters() (map[string]string, error) {
 		page++
 
 		// Safety check to prevent infinite loops
-		if page > 100 {
-			slog.Warn("Reached maximum page limit, stopping pagination", "max_pages", 100)
+		if page > 49 {
+			slog.Warn("Reached maximum page limit, stopping pagination", "max_pages", 50)
 			break
 		}
 	}
