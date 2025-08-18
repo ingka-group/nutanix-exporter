@@ -168,12 +168,31 @@ func (c *PCClient) RefreshCredentials(ncp auth.CredentialProvider) error {
 // CreateRequest takes context, request type, action, and request parameters
 // Returns a new HTTP request for PEClient
 func (c *PEClient) CreateRequest(ctx context.Context, reqType, action string, p RequestParams) (*http.Request, error) {
-	fullURL := fmt.Sprintf("%s/PrismGateway/services/rest/%s/", strings.Trim(c.URL, "/"), strings.Trim(action, "/"))
+	baseURL := fmt.Sprintf("%s/PrismGateway/services/rest/%s/", strings.Trim(c.URL, "/"), strings.Trim(action, "/"))
+
+	// Parse the base URL to add query parameters
+	parsedURL, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse URL: %w", err)
+	}
+
+	// Add query parameters if they exist
+	if p.Params != nil {
+		// Merge existing query parameters with new ones
+		query := parsedURL.Query()
+		for key, values := range p.Params {
+			for _, value := range values {
+				query.Add(key, value)
+			}
+		}
+		parsedURL.RawQuery = query.Encode()
+	}
+
+	fullURL := parsedURL.String()
 
 	slog.Info("Sending request to", "url", fullURL, "action", action, "reqType", reqType)
 
 	var req *http.Request
-	var err error
 
 	// Check if the payload is not nil and marshal it to JSON if needed
 	if p.Payload != nil {
@@ -202,12 +221,32 @@ func (c *PEClient) CreateRequest(ctx context.Context, reqType, action string, p 
 // CreateRequest takes context, request type, action and request parameters
 // Returns a new http request for PCClient
 func (c *PCClient) CreateRequest(ctx context.Context, reqType, action string, p RequestParams) (*http.Request, error) {
-	fullURL := fmt.Sprintf("%s/%s", strings.Trim(c.URL, "/"), strings.Trim(action, "/"))
+	// Build the base URL
+	baseURL := fmt.Sprintf("%s/%s", strings.Trim(c.URL, "/"), strings.Trim(action, "/"))
+
+	// Parse the base URL to add query parameters
+	parsedURL, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse URL: %w", err)
+	}
+
+	// Add query parameters if they exist
+	if p.Params != nil {
+		// Merge existing query parameters with new ones
+		query := parsedURL.Query()
+		for key, values := range p.Params {
+			for _, value := range values {
+				query.Add(key, value)
+			}
+		}
+		parsedURL.RawQuery = query.Encode()
+	}
+
+	fullURL := parsedURL.String()
 
 	slog.Info("Sending request to", "url", fullURL, "action", action, "reqType", reqType)
 
 	var req *http.Request
-	var err error
 
 	// Check if the payload is not nil and marshal it to JSON if needed
 	if p.Payload != nil {
