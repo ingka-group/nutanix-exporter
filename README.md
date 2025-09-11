@@ -31,7 +31,7 @@ The Nutanix Exporter is a Go application that fetches live data from any number 
   - The cluster specific environment variable names can only contain letters A-Z, numbers 0-9 and underscores (_).
     Lower case letters should be converted to upper case and all other characters to underscores.
 
-    **Example**
+    **Example**\
     If your cluster name is `cluster.name` or `cluster-name`, then the environment variables must be written as:
 
     - `PE_USERNAME_CLUSTER_NAME`
