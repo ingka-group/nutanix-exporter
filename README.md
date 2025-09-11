@@ -28,8 +28,10 @@ The Nutanix Exporter is a Go application that fetches live data from any number 
   - The `VAULT_ADDR` environment variable must not be defined
   - `PC_USERNAME` and `PC_PASSWORD` environment variables must be defined with Prism Central credentials
   - For each cluster the `PE_USERNAME_<CLUSTERNAME>` and `PE_PASSWORD_<CLUSTERNAME>` environment variables have to be defined with Prism Element credentials
-  - The cluster specific environment variable names can only contain letters A-Z, numbers 0-9, as well as underscores (_), dashes (-), and periods(.) 
-    Lower case letters should be converted to upper case.
+  - The cluster specific environment variable names can only contain letters A-Z, numbers 0-9 and underscores (_).
+    Lower case letters should be converted to upper case and all other characters to underscores.
+
+    Example: `cluster.name` or `cluster-name` gets `PE_USERNAME_CLUSTER_NAME` and `PE_PASSWORD_CLUSTER_NAME`
 
 ### Metrics Configuration
 
@@ -71,7 +73,7 @@ For both methods, start by cloning the repository and navigating to the repo roo
 To build and run the Go binary natively:
 
 1. Download and install Go from [here](https://go.dev/doc/install)
-2. Export all necessary environment variables (Note: If using the environment variable based credential provider, cluster names containing periods or dashes cannot be exported to shell variables)
+2. Export all necessary environment variables
 3. `go run cmd/nutanix_exporter/main.go`
 4. The exporter will now be running on `localhost:9408`
 

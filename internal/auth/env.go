@@ -80,6 +80,6 @@ func (e *EnvCredentialProvider) GetPECreds(cluster string) (string, string, erro
 // convertClusterName converts the cluster name to uppercase and replaces non-alphanumeric characters with underscores.
 func (e *EnvCredentialProvider) convertClusterName(cluster string) string {
 	cluster = strings.ToUpper(cluster)
-	r, _ := regexp.Compile("[^A-Z0-9_.-]+")
+	r, _ := regexp.Compile("[^A-Z0-9_]+")
 	return r.ReplaceAllString(cluster, "_")
 }
