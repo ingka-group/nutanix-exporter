@@ -219,6 +219,9 @@ func (e *Exporter) processEntity(ent map[string]interface{}, isCluster bool) {
 				// For entity-level metrics, use both cluster name and entity name as labels
 				if name, ok := ent["name"].(string); ok {
 					labelValues = []string{e.Cluster.Name, name}
+					// Check for vmname key if name key is not present (used in VMv1 API)
+				} else if name, ok := ent["vmName"].(string); ok {
+					labelValues = []string{e.Cluster.Name, name}
 				} else {
 					// Handle case where "name" is missing or not a string
 					labelValues = []string{e.Cluster.Name, "unknown"}

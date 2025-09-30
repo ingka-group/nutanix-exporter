@@ -40,6 +40,10 @@ type VmExporter struct {
 	*Exporter
 }
 
+type Vmv1Exporter struct {
+	*Exporter
+}
+
 type StorageContainerExporter struct {
 	*Exporter
 }
@@ -67,6 +71,15 @@ func NewHostCollector(cluster *nutanix.Cluster, configPath string) *HostsExporte
 func NewVMCollector(cluster *nutanix.Cluster, configPath string) *VmExporter {
 	labels := []string{"cluster_name", "vm_name"}
 	exporter := &VmExporter{
+		Exporter: NewExporter(cluster, labels),
+	}
+	exporter.initMetrics(configPath, labels)
+	return exporter
+}
+
+func NewVMv1Collector(cluster *nutanix.Cluster, configPath string) *Vmv1Exporter {
+	labels := []string{"cluster_name", "vm_name"}
+	exporter := &Vmv1Exporter{
 		Exporter: NewExporter(cluster, labels),
 	}
 	exporter.initMetrics(configPath, labels)
@@ -146,6 +159,24 @@ func (e *VmExporter) Collect(ch chan<- prometheus.Metric) {
 	result, err := e.fetchData(ctx, "/v2.0/vms/")
 	if err != nil {
 		slog.Error("Error fetching VM data", "error", err)
+		return
+	}
+
+	e.updateMetrics(result)
+
+	for _, gaugeVec := range e.Metrics {
+		gaugeVec.Collect(ch)
+	}
+}
+
+// Collect
+func (e *Vmv1Exporter) Collect(ch chan<- prometheus.Metric) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := e.fetchData(ctx, "/v1/vms/")
+	if err != nil {
+		slog.Error("Error fetching VM v1 data", "error", err)
 		return
 	}
 

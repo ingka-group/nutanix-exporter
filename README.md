@@ -46,6 +46,8 @@ Metrics are collected from the Prism Element v2.0 APIs. Currently, the exporter 
 - VMs
 - Storage Containers
 
+Additionally, the v1 VM API is supported for gathering additional stats not available in the v2 API. The config file for this endpoint is `vm_v1.yaml`.
+
 The response from the API contains a list of entities, each with a set of key-value pairs. The exporter will flatten these key-value pairs and expose them as Prometheus metrics.
 
 `/config` contains a YAML configuration file for each exporter. This is where the metrics to be collected are defined. Any value in the API response can be collected; however, the exporter will only collect metrics that are defined in the configuration file. It is important to note that nested fields in the API response are flattened and exposed like "parent_child", e.g. "stats_num_iops".
@@ -76,7 +78,7 @@ For both methods, start by cloning the repository and navigating to the repo roo
 
 To build and run the Go binary natively:
 
-1. Download and install Go from [here](https://go.dev/doc/install)
+1. Download and install the [Go Programming Language](https://go.dev/doc/install)
 2. Export all necessary environment variables
 3. `go run cmd/nutanix_exporter/main.go`
 4. The exporter will now be running on `localhost:9408`

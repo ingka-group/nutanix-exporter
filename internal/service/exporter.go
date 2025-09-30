@@ -173,6 +173,7 @@ func (es *ExporterService) refreshClusters() error {
 			prom.NewClusterCollector(cluster, es.config.ConfigPath+"/cluster.yaml"),
 			prom.NewHostCollector(cluster, es.config.ConfigPath+"/host.yaml"),
 			prom.NewVMCollector(cluster, es.config.ConfigPath+"/vm.yaml"),
+			prom.NewVMv1Collector(cluster, es.config.ConfigPath+"/vm_v1.yaml"),
 		}
 
 		for _, collector := range collectors {
