@@ -54,6 +54,10 @@ func NewExporterService(cfg *config.Config, credProvider auth.CredentialProvider
 }
 
 func (es *ExporterService) Start() error {
+	return es.StartWithServer(true)
+}
+
+func (es *ExporterService) StartWithServer(startHTTPServer bool) error {
 	// Initialize Prism Central connection
 	if err := es.initializePrismCentral(); err != nil {
 		return fmt.Errorf("failed to initialize Prism Central: %w", err)
@@ -67,18 +71,33 @@ func (es *ExporterService) Start() error {
 	// Start refresh goroutines
 	es.startRefreshRoutines()
 
-	// Setup HTTP server
-	es.setupHTTPHandlers()
+	if startHTTPServer {
+		// Setup HTTP server
+		es.setupHTTPHandlers()
 
-	// Start server
-	go func() {
-		slog.Info("Starting server", "address", ListenAddress)
-		if err := es.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("Server error", "error", err)
-		}
-	}()
+		// Start server
+		go func() {
+			slog.Info("Starting server", "address", ListenAddress)
+			if err := es.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("Server error", "error", err)
+			}
+		}()
+	}
 
 	return nil
+}
+
+func (es *ExporterService) GetHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		es.clustersMu.RLock()
+		gatherers := make(prometheus.Gatherers, 0, len(es.clustersMap))
+		for _, cluster := range es.clustersMap {
+			cluster.RefreshCredentialsIfNeeded(es.credentialProvider)
+			gatherers = append(gatherers, cluster.Registry)
+		}
+		es.clustersMu.RUnlock()
+		promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{}).ServeHTTP(w, r)
+	})
 }
 
 func (es *ExporterService) Stop() error {
