@@ -187,13 +187,32 @@ func (es *ExporterService) refreshClusters() error {
 
 		// Register collectors for this cluster
 		slog.Info("Registering collectors for cluster", "name", name)
-		collectors := []prometheus.Collector{
-			prom.NewStorageContainerCollector(cluster, es.config.ConfigPath+"/storage_container.yaml"),
-			prom.NewClusterCollector(cluster, es.config.ConfigPath+"/cluster.yaml"),
-			prom.NewHostCollector(cluster, es.config.ConfigPath+"/host.yaml"),
-			prom.NewVMCollector(cluster, es.config.ConfigPath+"/vm.yaml"),
-			prom.NewVMv1Collector(cluster, es.config.ConfigPath+"/vm_v1.yaml"),
+		scCollector, err := prom.NewStorageContainerCollector(cluster, es.config.ConfigPath+"/storage_container.yaml")
+		if err != nil {
+			slog.Error("Failed to init storage container collector", "cluster", name, "error", err)
+			continue
 		}
+		clusterCollector, err := prom.NewClusterCollector(cluster, es.config.ConfigPath+"/cluster.yaml")
+		if err != nil {
+			slog.Error("Failed to init cluster collector", "cluster", name, "error", err)
+			continue
+		}
+		hostCollector, err := prom.NewHostCollector(cluster, es.config.ConfigPath+"/host.yaml")
+		if err != nil {
+			slog.Error("Failed to init host collector", "cluster", name, "error", err)
+			continue
+		}
+		vmCollector, err := prom.NewVMCollector(cluster, es.config.ConfigPath+"/vm.yaml")
+		if err != nil {
+			slog.Error("Failed to init VM collector", "cluster", name, "error", err)
+			continue
+		}
+		vmv1Collector, err := prom.NewVMv1Collector(cluster, es.config.ConfigPath+"/vm_v1.yaml")
+		if err != nil {
+			slog.Error("Failed to init VM v1 collector", "cluster", name, "error", err)
+			continue
+		}
+		collectors := []prometheus.Collector{scCollector, clusterCollector, hostCollector, vmCollector, vmv1Collector}
 
 		for _, collector := range collectors {
 			cluster.Registry.MustRegister(collector)

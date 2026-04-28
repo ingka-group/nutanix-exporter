@@ -50,49 +50,59 @@ type StorageContainerExporter struct {
 
 // ----- Constructors ----- //
 
-func NewClusterCollector(cluster *nutanix.Cluster, configPath string) *ClusterExporter {
+func NewClusterCollector(cluster *nutanix.Cluster, configPath string) (*ClusterExporter, error) {
 	labels := []string{"cluster_name"}
 	exporter := &ClusterExporter{
 		Exporter: NewExporter(cluster, labels),
 	}
-	exporter.initMetrics(configPath, labels)
-	return exporter
+	if err := exporter.initMetrics(configPath, labels); err != nil {
+		return nil, err
+	}
+	return exporter, nil
 }
 
-func NewHostCollector(cluster *nutanix.Cluster, configPath string) *HostsExporter {
+func NewHostCollector(cluster *nutanix.Cluster, configPath string) (*HostsExporter, error) {
 	labels := []string{"cluster_name", "host_name"}
 	exporter := &HostsExporter{
 		Exporter: NewExporter(cluster, labels),
 	}
-	exporter.initMetrics(configPath, labels)
-	return exporter
+	if err := exporter.initMetrics(configPath, labels); err != nil {
+		return nil, err
+	}
+	return exporter, nil
 }
 
-func NewVMCollector(cluster *nutanix.Cluster, configPath string) *VmExporter {
+func NewVMCollector(cluster *nutanix.Cluster, configPath string) (*VmExporter, error) {
 	labels := []string{"cluster_name", "vm_name"}
 	exporter := &VmExporter{
 		Exporter: NewExporter(cluster, labels),
 	}
-	exporter.initMetrics(configPath, labels)
-	return exporter
+	if err := exporter.initMetrics(configPath, labels); err != nil {
+		return nil, err
+	}
+	return exporter, nil
 }
 
-func NewVMv1Collector(cluster *nutanix.Cluster, configPath string) *Vmv1Exporter {
+func NewVMv1Collector(cluster *nutanix.Cluster, configPath string) (*Vmv1Exporter, error) {
 	labels := []string{"cluster_name", "vm_name"}
 	exporter := &Vmv1Exporter{
 		Exporter: NewExporter(cluster, labels),
 	}
-	exporter.initMetrics(configPath, labels)
-	return exporter
+	if err := exporter.initMetrics(configPath, labels); err != nil {
+		return nil, err
+	}
+	return exporter, nil
 }
 
-func NewStorageContainerCollector(cluster *nutanix.Cluster, configPath string) *StorageContainerExporter {
+func NewStorageContainerCollector(cluster *nutanix.Cluster, configPath string) (*StorageContainerExporter, error) {
 	labels := []string{"cluster_name", "container_name"}
 	exporter := &StorageContainerExporter{
 		Exporter: NewExporter(cluster, labels),
 	}
-	exporter.initMetrics(configPath, labels)
-	return exporter
+	if err := exporter.initMetrics(configPath, labels); err != nil {
+		return nil, err
+	}
+	return exporter, nil
 }
 
 // ----- Collect Methods ----- //
