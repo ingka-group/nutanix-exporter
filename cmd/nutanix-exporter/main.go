@@ -57,7 +57,7 @@ func main() {
 
 	// Create and start exporter service
 	exporterService := service.NewExporterService(cfg, credProvider)
-	if err := exporterService.Start(); err != nil {
+	if err = exporterService.Start(); err != nil {
 		slog.Error("Failed to start exporter service", "error", err)
 		os.Exit(1)
 	}
@@ -69,6 +69,9 @@ func main() {
 
 	// Stop services and disconnect clients
 	stop()
-	exporterService.Stop()
+	err = exporterService.Stop()
+	if err != nil {
+		slog.Error("Failed to stop exporter service", "error", err)
+	}
 	slog.Info("Graceful shutdown completed")
 }
