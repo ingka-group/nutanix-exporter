@@ -1,0 +1,21 @@
+version: "2"
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  default: none
+  enable:
+    - asciicheck # Checks that all code identifiers does not have non-ASCII symbols in the name.
+    - bodyclose # Checks whether HTTP response body is closed successfully.
+    - contextcheck # Check whether the function uses a non-inherited context.
+    - errcheck # Errcheck is a program for checking for unchecked errors in Go code.
+    - errname # Checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error.
+    - govet # Vet examines Go source code and reports suspicious constructs, such as Printf calls whose arguments do not align with the format string.
+    - ineffassign # Detects when assignments to existing variables are not used.
+    - sloglint # Ensure consistent code style when using log/slog.
+    - staticcheck # Staticcheck is a go vet on steroids, applying a ton of static analysis checks to find bugs and performance issues.
+    # See https://staticcheck.dev/docs/checks/
+    - unused # Checks for unused constants, variables, functions, and types.
+
