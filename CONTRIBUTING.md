@@ -46,3 +46,4 @@ Thank you for your contributions!
 - PR Merge commits must contain (MAJOR|MINOR|PATCH) in the commit message (Automated semantic versioning)
 - Functions and variables must be preceded by a comment that describes them, starting with the function/var name (IntelliSense/GoDoc)
 - Code should be formatted with `gofmt` before committing
+- Code must pass `golangci-lint` before committing (run `make lint`). Linting is enforced as part of the CI workflow on all PRs to `main`.
