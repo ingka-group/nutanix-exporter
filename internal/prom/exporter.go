@@ -62,7 +62,7 @@ func (e *Exporter) valueToFloat64(value any) float64 {
 	case float64:
 		return v
 	case bool:
-		if v == true {
+		if v {
 			return 1.0
 		} else {
 			return 0.0
