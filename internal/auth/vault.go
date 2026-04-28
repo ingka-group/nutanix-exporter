@@ -56,7 +56,7 @@ func NewVaultCredentialProvider(cfg *config.Config) (*VaultCredentialProvider, e
 		SecretId: cfg.VaultSecretId,
 	}
 
-	var resp *vault.Response[map[string]interface{}]
+	var resp *vault.Response[map[string]any]
 	if cfg.VaultNamespace != "" {
 		resp, err = client.Auth.AppRoleLogin(ctx, loginRequest, vault.WithNamespace(cfg.VaultNamespace))
 	} else {

@@ -57,7 +57,7 @@ func NewExporter(cluster *nutanix.Cluster, labels []string) *Exporter {
 // valueToFloat64 converts given value to Float64
 // If the value is a string, it will be checked for "on" and "off" and converted to 1 and 0 respectively
 // Otherwise it will be parsed as a float64
-func (e *Exporter) valueToFloat64(value interface{}) float64 {
+func (e *Exporter) valueToFloat64(value any) float64 {
 	switch v := value.(type) {
 	case float64:
 		return v
@@ -85,15 +85,15 @@ func (e *Exporter) normalizeKey(key string) string {
 }
 
 // flattenMap flattens a nested map into a flat map with keys separated by underscores
-func (e *Exporter) flattenMap(prefix string, nestedMap map[string]interface{}) map[string]interface{} {
+func (e *Exporter) flattenMap(prefix string, nestedMap map[string]any) map[string]any {
 
-	flatMap := make(map[string]interface{})
+	flatMap := make(map[string]any)
 	for key, value := range nestedMap {
 		flatKey := key
 		if prefix != "" {
 			flatKey = prefix + "_" + key
 		}
-		if nested, ok := value.(map[string]interface{}); ok {
+		if nested, ok := value.(map[string]any); ok {
 			for k, v := range e.flattenMap(flatKey, nested) {
 				flatMap[k] = v
 			}
@@ -180,17 +180,17 @@ func (e *Exporter) initMetrics(configPath string, labelNames []string) error {
 }
 
 // updateMetrics processes the JSON structure for hosts and updates the metrics.
-func (e *Exporter) updateMetrics(data map[string]interface{}) {
+func (e *Exporter) updateMetrics(data map[string]any) {
 	// Check if metadata exists and process it
-	if metadata, ok := data["metadata"].(map[string]interface{}); ok {
+	if metadata, ok := data["metadata"].(map[string]any); ok {
 		e.processMetadata(metadata)
 	}
 
 	// Check if the "entities" key is present and is a list
-	if entities, ok := data["entities"].([]interface{}); ok {
+	if entities, ok := data["entities"].([]any); ok {
 		// Iterate over the list of entities and process each one
 		for _, entity := range entities {
-			if ent, ok := entity.(map[string]interface{}); ok {
+			if ent, ok := entity.(map[string]any); ok {
 				e.processEntity(ent, false)
 			}
 		}
@@ -203,7 +203,7 @@ func (e *Exporter) updateMetrics(data map[string]interface{}) {
 }
 
 // processEntity handles the processing of a single entity (either a regular entity or the entire cluster)
-func (e *Exporter) processEntity(ent map[string]interface{}, isCluster bool) {
+func (e *Exporter) processEntity(ent map[string]any, isCluster bool) {
 	// Flatten the map (recursively) to get a flat map with nested keys separated by underscores
 	flatEntity := e.flattenMap("", ent)
 
@@ -236,7 +236,7 @@ func (e *Exporter) processEntity(ent map[string]interface{}, isCluster bool) {
 }
 
 // processMetadata handles the processing of metadata for responses that contain an entity list
-func (e *Exporter) processMetadata(metadata map[string]interface{}) {
+func (e *Exporter) processMetadata(metadata map[string]any) {
 	// Flatten the map (recursively) to get a flat map with nested keys separated by underscores
 	flatMetadata := e.flattenMap("", metadata)
 	for key, value := range flatMetadata {

@@ -73,7 +73,7 @@ type RequestParams struct {
 	Body    string
 	Header  string
 	Params  url.Values
-	Payload interface{}
+	Payload any
 }
 
 // NewCluster returns a new Nutanix cluster object, fetching credentials and creating an API client.
