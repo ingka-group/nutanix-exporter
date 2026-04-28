@@ -272,11 +272,17 @@ func (es *ExporterService) fetchClusters() (map[string]string, error) {
 		}
 
 		var result map[string]any
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			resp.Body.Close()
-			return nil, fmt.Errorf("failed to decode response for page %d: %w", page, err)
+		decodeErr := func() (err error) {
+			defer func() {
+				if cerr := resp.Body.Close(); cerr != nil && err == nil {
+					err = cerr
+				}
+			}()
+			return json.NewDecoder(resp.Body).Decode(&result)
+		}()
+		if decodeErr != nil {
+			return nil, fmt.Errorf("failed to decode response for page %d: %w", page, decodeErr)
 		}
-		resp.Body.Close()
 
 		clusters, total, err := parseClusters(result)
 		if err != nil {
@@ -494,7 +500,7 @@ func (es *ExporterService) setupHTTPHandlers() {
 }
 
 func (es *ExporterService) indexHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, `<html><head><title>Nutanix Exporter</title></head><body><h1>Nutanix Exporter</h1><p><a href="/metrics">Metrics</a></p></body></html>`)
+	_, _ = fmt.Fprint(w, `<html><head><title>Nutanix Exporter</title></head><body><h1>Nutanix Exporter</h1><p><a href="/metrics">Metrics</a></p></body></html>`)
 }
 
 func (es *ExporterService) metricsHandler(w http.ResponseWriter, r *http.Request) {
