@@ -19,7 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 
 	"os"
 	"path/filepath"
@@ -130,8 +129,7 @@ func (e *Exporter) fetchData(ctx context.Context, path string) (result map[strin
 	}
 
 	if err = json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		slog.Error("Error decoding response body", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to decode response body: %w", err)
 	}
 
 	return result, nil
