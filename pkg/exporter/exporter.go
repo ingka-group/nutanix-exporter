@@ -18,6 +18,7 @@ limitations under the License.
 package exporter
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -59,9 +60,10 @@ func NewExporterService(cfg *Config, credProvider CredentialProvider) *ExporterS
 }
 
 // StartWithServer initializes the exporter. When startHTTPServer is true, the
-// built-in HTTP server is also started on the default listen address.
-func (es *ExporterService) StartWithServer(startHTTPServer bool) error {
-	return es.svc.StartWithServer(startHTTPServer)
+// built-in HTTP server is also started on the default listen address. The
+// provided context controls the lifecycle of background refresh goroutines.
+func (es *ExporterService) StartWithServer(ctx context.Context, startHTTPServer bool) error {
+	return es.svc.StartWithServer(ctx, startHTTPServer)
 }
 
 // GetHandler returns an http.Handler that serves combined Prometheus metrics

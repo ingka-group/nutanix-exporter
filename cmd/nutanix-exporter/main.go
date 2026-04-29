@@ -55,16 +55,17 @@ func main() {
 		slog.Info("Using environment variable credential provider")
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	defer stop()
+
 	// Create and start exporter service
 	exporterService := service.NewExporterService(cfg, credProvider)
-	if err = exporterService.Start(); err != nil {
+	if err = exporterService.Start(ctx); err != nil {
 		slog.Error("Failed to start exporter service", "error", err)
 		os.Exit(1)
 	}
 
 	// Wait for shutdown signal
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-	defer stop()
 	<-ctx.Done()
 
 	// Stop services and disconnect clients

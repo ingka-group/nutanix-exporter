@@ -61,23 +61,23 @@ func NewExporterService(cfg *config.Config, credProvider auth.CredentialProvider
 	}
 }
 
-func (es *ExporterService) Start() error {
-	return es.StartWithServer(true)
+func (es *ExporterService) Start(ctx context.Context) error {
+	return es.StartWithServer(ctx, true)
 }
 
-func (es *ExporterService) StartWithServer(startHTTPServer bool) error {
+func (es *ExporterService) StartWithServer(ctx context.Context, startHTTPServer bool) error {
 	// Initialize Prism Central connection
 	if err := es.initializePrismCentral(); err != nil {
 		return fmt.Errorf("failed to initialize Prism Central: %w", err)
 	}
 
 	// Initialize clusters
-	if err := es.refreshClusters(); err != nil {
+	if err := es.refreshClusters(ctx); err != nil {
 		return fmt.Errorf("failed to initialize clusters: %w", err)
 	}
 
 	// Start refresh goroutines
-	es.startRefreshRoutines()
+	es.startRefreshRoutines(ctx)
 
 	if startHTTPServer {
 		// Setup HTTP server
@@ -136,18 +136,23 @@ func (es *ExporterService) initializePrismCentral() error {
 	return nil
 }
 
-func (es *ExporterService) startRefreshRoutines() {
+func (es *ExporterService) startRefreshRoutines(ctx context.Context) {
 	// Credential refresh
 	if es.config.VaultRefreshInterval > 0 {
 		go func() {
 			ticker := time.NewTicker(es.config.VaultRefreshInterval)
 			defer ticker.Stop()
-			for range ticker.C {
-				slog.Info("Refreshing credentials...")
-				if err := es.credentialProvider.Refresh(); err != nil {
-					slog.Error("Failed to refresh credentials", "error", err)
-				} else {
-					slog.Info("Credentials refreshed successfully")
+			for {
+				select {
+				case <-ticker.C:
+					slog.Info("Refreshing credentials...")
+					if err := es.credentialProvider.Refresh(); err != nil {
+						slog.Error("Failed to refresh credentials", "error", err)
+					} else {
+						slog.Info("Credentials refreshed successfully")
+					}
+				case <-ctx.Done():
+					return
 				}
 			}
 		}()
@@ -158,20 +163,25 @@ func (es *ExporterService) startRefreshRoutines() {
 		go func() {
 			ticker := time.NewTicker(es.config.ClusterRefreshInterval)
 			defer ticker.Stop()
-			for range ticker.C {
-				slog.Info("Refreshing cluster list...")
-				if err := es.refreshClusters(); err != nil {
-					slog.Error("Failed to refresh clusters", "error", err)
-				} else {
-					slog.Info("Cluster list refreshed successfully")
+			for {
+				select {
+				case <-ticker.C:
+					slog.Info("Refreshing cluster list...")
+					if err := es.refreshClusters(ctx); err != nil {
+						slog.Error("Failed to refresh clusters", "error", err)
+					} else {
+						slog.Info("Cluster list refreshed successfully")
+					}
+				case <-ctx.Done():
+					return
 				}
 			}
 		}()
 	}
 }
 
-func (es *ExporterService) refreshClusters() error {
-	clusterData, err := es.fetchClusters()
+func (es *ExporterService) refreshClusters(ctx context.Context) error {
+	clusterData, err := es.fetchClusters(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch clusters: %w", err)
 	}
@@ -236,8 +246,8 @@ func (es *ExporterService) refreshClusters() error {
 	return nil
 }
 
-func (es *ExporterService) fetchClusters() (map[string]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+func (es *ExporterService) fetchClusters(ctx context.Context) (map[string]string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	clusterData := make(map[string]string)
