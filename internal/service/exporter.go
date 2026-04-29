@@ -92,7 +92,6 @@ func (es *ExporterService) GetHandler() http.Handler {
 		es.clustersMu.RLock()
 		gatherers := make(prometheus.Gatherers, 0, len(es.clustersMap))
 		for _, cluster := range es.clustersMap {
-			cluster.RefreshCredentialsIfNeeded(es.credentialProvider)
 			gatherers = append(gatherers, cluster.Registry)
 		}
 		es.clustersMu.RUnlock()
@@ -364,18 +363,17 @@ func (es *ExporterService) fetchClusters() (map[string]string, error) {
 
 // API request methods
 func (es *ExporterService) makeV3Request(ctx context.Context, page int) (*http.Response, error) {
-	payload := map[string]any{
-		"kind":   "cluster",
-		"length": 100,
-		"offset": page * 100,
-	}
-	return es.pcCluster.API.MakeRequestWithParams(ctx, "POST", "/api/nutanix/v3/clusters/list", nutanix.RequestParams{
-		Payload: payload,
+	return es.pcCluster.API.MakeRequest(ctx, "POST", "/api/nutanix/v3/clusters/list", nutanix.RequestOptions{
+		Payload: map[string]any{
+			"kind":   "cluster",
+			"length": 100,
+			"offset": page * 100,
+		},
 	})
 }
 
 func (es *ExporterService) makeV4Request(ctx context.Context, page int) (*http.Response, error) {
-	return es.pcCluster.API.MakeRequestWithParams(ctx, "GET", "/api/clustermgmt/v4.0/config/clusters", nutanix.RequestParams{
+	return es.pcCluster.API.MakeRequest(ctx, "GET", "/api/clustermgmt/v4.0/config/clusters", nutanix.RequestOptions{
 		Params: url.Values{
 			"$limit":   []string{"100"},
 			"$page":    []string{fmt.Sprintf("%d", page)},
@@ -385,7 +383,7 @@ func (es *ExporterService) makeV4Request(ctx context.Context, page int) (*http.R
 }
 
 func (es *ExporterService) makeV4b1Request(ctx context.Context, page int) (*http.Response, error) {
-	return es.pcCluster.API.MakeRequestWithParams(ctx, "GET", "/api/clustermgmt/v4.0.b1/config/clusters", nutanix.RequestParams{
+	return es.pcCluster.API.MakeRequest(ctx, "GET", "/api/clustermgmt/v4.0.b1/config/clusters", nutanix.RequestOptions{
 		Params: url.Values{
 			"$limit":   []string{"100"},
 			"$page":    []string{fmt.Sprintf("%d", page)},
@@ -514,9 +512,6 @@ func (es *ExporterService) metricsHandler(w http.ResponseWriter, r *http.Request
 		http.NotFound(w, r)
 		return
 	}
-
-	// Refresh credentials for the specific cluster
-	cluster.RefreshCredentialsIfNeeded(es.credentialProvider)
 
 	// Serve metrics from the specific cluster's registry
 	promhttp.HandlerFor(cluster.Registry, promhttp.HandlerOpts{}).ServeHTTP(w, r)

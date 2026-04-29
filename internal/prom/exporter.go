@@ -111,13 +111,8 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
-// fetchData makes a GET request to the given path and returns the response body a map[string]any. It also handles credential refresh logic in case of authentication errors.
+// fetchData makes a GET request to the given path and returns the response body as a map[string]any.
 func (e *Exporter) fetchData(ctx context.Context, path string) (result map[string]any, err error) {
-
-	if e.Cluster.RefreshNeeded {
-		return nil, fmt.Errorf("skipping %s due to known stale creds", e.Cluster.Name)
-	}
-
 	resp, err := e.Cluster.API.MakeRequest(ctx, "GET", path)
 	if err != nil {
 		return nil, err
@@ -128,15 +123,7 @@ func (e *Exporter) fetchData(ctx context.Context, path string) (result map[strin
 		}
 	}()
 
-	if resp.StatusCode == 403 || resp.StatusCode == 401 {
-		e.Cluster.Mutex.Lock()
-		if !e.Cluster.RefreshNeeded {
-			slog.Warn("Marking stale credentials for refresh", "cluster", e.Cluster.Name)
-			e.Cluster.RefreshNeeded = true
-		}
-		e.Cluster.Mutex.Unlock()
-		return nil, fmt.Errorf("authentication failed for cluster %s", e.Cluster.Name)
-	} else if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("request failed: %s", resp.Status)
 	}
 

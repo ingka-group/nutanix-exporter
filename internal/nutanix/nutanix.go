@@ -32,302 +32,232 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// NutanixClient is the interface implemented by all API clients.
 type NutanixClient interface {
-	RefreshCredentials(ncp auth.CredentialProvider) error
-	CreateRequest(ctx context.Context, reqType, action string, p RequestParams) (*http.Request, error)
-	MakeRequestWithParams(ctx context.Context, reqType, action string, p RequestParams) (*http.Response, error)
-	MakeRequest(ctx context.Context, reqType, action string) (*http.Response, error)
+	MakeRequest(ctx context.Context, method, action string, opts ...RequestOptions) (*http.Response, error)
 }
 
-// Cluster represents a Nutanix cluster (Prism Central OR Element)
+// Cluster represents a Nutanix cluster (Prism Central OR Element).
 type Cluster struct {
-	Name          string
-	URL           string `yaml:"URL"`
-	API           NutanixClient
-	Registry      *prometheus.Registry
-	Collectors    []prometheus.Collector
-	RefreshNeeded bool
-	Mutex         sync.Mutex
+	Name       string
+	URL        string `yaml:"URL"`
+	API        NutanixClient
+	Registry   *prometheus.Registry
+	Collectors []prometheus.Collector
+	Mutex      sync.Mutex
 }
 
-// PEClient represents the Prism Element API client
-type PEClient struct {
-	URL           string
-	Username      string
-	Password      string
-	SkipTLSVerify bool
-	Timeout       time.Duration
+// Client is a single HTTP client for either Prism Element or Prism Central.
+// The basePath field captures the URL-prefix difference between the two:
+//   - PE: "/PrismGateway/services/rest"
+//   - PC: "" (bare path)
+type Client struct {
+	baseURL      string
+	basePath     string
+	clusterName  string // used as the key for credential lookups
+	username     string
+	password     string
+	credProvider auth.CredentialProvider
+	isPC         bool
+	httpClient   *http.Client
+	credsMu      sync.RWMutex
+	refreshMu    sync.Mutex  // serialises refreshCreds; only one goroutine refreshes at a time
+	lastRefresh  time.Time   // others that arrive after a recent refresh skip calling it again
 }
 
-// PCClient represents the Prism Central API client
-type PCClient struct {
-	URL           string
-	Username      string
-	Password      string
-	SkipTLSVerify bool
-	Timeout       time.Duration
-}
-
-// RequestParams holds the components for a request (body, header, params)
-type RequestParams struct {
-	Body    string
-	Header  string
+// RequestOptions holds optional components for a request.
+type RequestOptions struct {
 	Params  url.Values
 	Payload any
+	Body    string
 }
 
-// NewCluster returns a new Nutanix cluster object, fetching credentials and creating an API client.
-func NewCluster(name, url string, ncp auth.CredentialProvider, isPC bool, skipTLSVerify bool, timeout time.Duration) *Cluster {
-	var api NutanixClient
+// NewCluster returns a new Nutanix Cluster, fetching credentials and constructing the API client.
+// Returns nil if credentials cannot be obtained.
+func NewCluster(name, rawURL string, ncp auth.CredentialProvider, isPC bool, skipTLSVerify bool, timeout time.Duration) *Cluster {
 	var username, password string
 	var err error
 
 	if isPC {
 		username, password, err = ncp.GetPCCreds(name)
-		if username == "" || password == "" {
-			slog.Error("Failed to get credentials for Prism Central", "name", name, "error", err)
-			return nil
-		}
-		api = NewPCClient(url, username, password, skipTLSVerify, timeout)
 	} else {
 		username, password, err = ncp.GetPECreds(name)
-		if username == "" || password == "" {
-			slog.Error("Failed to get credentials for Prism Element", "name", name, "error", err)
-			return nil
-		}
-		api = NewPEClient(url, username, password, skipTLSVerify, timeout)
 	}
+
+	if username == "" || password == "" {
+		kind := "Prism Element"
+		if isPC {
+			kind = "Prism Central"
+		}
+		slog.Error("Failed to get credentials", "kind", kind, "name", name, "error", err)
+		return nil
+	}
+
+	api := newClient(name, rawURL, username, password, ncp, isPC, skipTLSVerify, timeout)
 
 	return &Cluster{
 		Name:     name,
-		URL:      url,
+		URL:      rawURL,
 		API:      api,
 		Registry: prometheus.NewRegistry(),
 	}
 }
 
-// NewPEClient returns a new Prism Element client object
-func NewPEClient(url, username, password string, skipTLSVerify bool, timeout time.Duration) *PEClient {
-	return &PEClient{
-		URL:           url,
-		Username:      username,
-		Password:      password,
-		SkipTLSVerify: skipTLSVerify,
-		Timeout:       timeout,
+// newClient constructs a Client. basePath is set based on whether this targets PE or PC.
+func newClient(clusterName, baseURL, username, password string, ncp auth.CredentialProvider, isPC bool, skipTLSVerify bool, timeout time.Duration) *Client {
+	basePath := ""
+	if !isPC {
+		basePath = "/PrismGateway/services/rest"
+	}
+
+	return &Client{
+		baseURL:      strings.TrimRight(baseURL, "/"),
+		basePath:     basePath,
+		clusterName:  clusterName,
+		username:     username,
+		password:     password,
+		credProvider: ncp,
+		isPC:         isPC,
+		httpClient: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: skipTLSVerify}, //nolint:gosec
+			},
+			Timeout: timeout,
+		},
 	}
 }
 
-// NewPCClient returns a new Prism Central client object
-func NewPCClient(url, username, password string, skipTLSVerify bool, timeout time.Duration) *PCClient {
-	return &PCClient{
-		URL:           url,
-		Username:      username,
-		Password:      password,
-		SkipTLSVerify: skipTLSVerify,
-		Timeout:       timeout,
-	}
+// NewPEClient returns a NutanixClient targeting a Prism Element cluster.
+func NewPEClient(clusterName, rawURL, username, password string, ncp auth.CredentialProvider, skipTLSVerify bool, timeout time.Duration) NutanixClient {
+	return newClient(clusterName, rawURL, username, password, ncp, false, skipTLSVerify, timeout)
 }
 
-// Refreshes stale credentials using client methods
-func (c *Cluster) RefreshCredentialsIfNeeded(ncp auth.CredentialProvider) {
-	c.Mutex.Lock()
-	defer c.Mutex.Unlock()
-
-	if c.RefreshNeeded {
-		if err := c.API.RefreshCredentials(ncp); err != nil {
-			slog.Error("Failed to refresh credentials for cluster", "name", c.Name, "error", err)
-			return
-		}
-		c.RefreshNeeded = false // Reset the flag after refreshing
-		slog.Info("Credentials refreshed for cluster", "name", c.Name)
-	}
+// NewPCClient returns a NutanixClient targeting Prism Central.
+func NewPCClient(clusterName, rawURL, username, password string, ncp auth.CredentialProvider, skipTLSVerify bool, timeout time.Duration) NutanixClient {
+	return newClient(clusterName, rawURL, username, password, ncp, true, skipTLSVerify, timeout)
 }
 
-// RefreshCredentials refreshes the credentials for the PEClient
-func (c *PEClient) RefreshCredentials(ncp auth.CredentialProvider) error {
-	username, password, err := ncp.GetPECreds(c.URL)
-	if username == "" || password == "" {
-		return fmt.Errorf("failed to refresh credentials for PE client %s: %v", c.URL, err)
-	}
-	c.Username = username
-	c.Password = password
-	return nil
-}
+// buildRequest constructs an HTTP request from method, action path, and optional opts.
+func (c *Client) buildRequest(ctx context.Context, method, action string, opt RequestOptions) (*http.Request, error) {
+	rawURL := fmt.Sprintf("%s%s/%s", c.baseURL, c.basePath, strings.Trim(action, "/"))
 
-// RefreshCredentials refreshes the credentials for the PCClient
-func (c *PCClient) RefreshCredentials(ncp auth.CredentialProvider) error {
-	username, password, err := ncp.GetPCCreds(c.URL)
-	if username == "" || password == "" {
-		return fmt.Errorf("failed to refresh credentials for PC client %s: %v", c.URL, err)
-	}
-	c.Username = username
-	c.Password = password
-	return nil
-}
-
-// CreateRequest takes context, request type, action, and request parameters
-// Returns a new HTTP request for PEClient
-func (c *PEClient) CreateRequest(ctx context.Context, reqType, action string, p RequestParams) (*http.Request, error) {
-	baseURL := fmt.Sprintf("%s/PrismGateway/services/rest/%s/", strings.Trim(c.URL, "/"), strings.Trim(action, "/"))
-
-	// Parse the base URL to add query parameters
-	parsedURL, err := url.Parse(baseURL)
+	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse URL: %w", err)
 	}
 
-	// Add query parameters if they exist
-	if p.Params != nil {
-		// Merge existing query parameters with new ones
-		query := parsedURL.Query()
-		for key, values := range p.Params {
-			for _, value := range values {
-				query.Add(key, value)
+	if opt.Params != nil {
+		q := parsedURL.Query()
+		for key, values := range opt.Params {
+			for _, v := range values {
+				q.Add(key, v)
 			}
 		}
-		parsedURL.RawQuery = query.Encode()
+		parsedURL.RawQuery = q.Encode()
 	}
 
 	fullURL := parsedURL.String()
-
-	slog.Info("Sending request to", "url", fullURL, "action", action, "reqType", reqType)
+	slog.Info("Sending request", "url", fullURL, "method", method)
 
 	var req *http.Request
-
-	// Check if the payload is not nil and marshal it to JSON if needed
-	if p.Payload != nil {
-		jsonPayload, err := json.Marshal(p.Payload)
+	if opt.Payload != nil {
+		jsonPayload, err := json.Marshal(opt.Payload)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal payload: %w", err)
 		}
-		req, err = http.NewRequestWithContext(ctx, reqType, fullURL, strings.NewReader(string(jsonPayload)))
+		req, err = http.NewRequestWithContext(ctx, method, fullURL, strings.NewReader(string(jsonPayload)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 	} else {
-		// Use the old method with body as string if no payload is provided
-		req, err = http.NewRequestWithContext(ctx, reqType, fullURL, strings.NewReader(p.Body))
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.SetBasicAuth(c.Username, c.Password)
-	return req, nil
-}
-
-// CreateRequest takes context, request type, action and request parameters
-// Returns a new http request for PCClient
-func (c *PCClient) CreateRequest(ctx context.Context, reqType, action string, p RequestParams) (*http.Request, error) {
-	// Build the base URL
-	baseURL := fmt.Sprintf("%s/%s", strings.Trim(c.URL, "/"), strings.Trim(action, "/"))
-
-	// Parse the base URL to add query parameters
-	parsedURL, err := url.Parse(baseURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse URL: %w", err)
-	}
-
-	// Add query parameters if they exist
-	if p.Params != nil {
-		// Merge existing query parameters with new ones
-		query := parsedURL.Query()
-		for key, values := range p.Params {
-			for _, value := range values {
-				query.Add(key, value)
-			}
-		}
-		parsedURL.RawQuery = query.Encode()
-	}
-
-	fullURL := parsedURL.String()
-
-	slog.Info("Sending request to", "url", fullURL, "action", action, "reqType", reqType)
-
-	var req *http.Request
-
-	// Check if the payload is not nil and marshal it to JSON if needed
-	if p.Payload != nil {
-		jsonPayload, err := json.Marshal(p.Payload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal payload: %w", err)
-		}
-		req, err = http.NewRequestWithContext(ctx, reqType, fullURL, strings.NewReader(string(jsonPayload)))
+		req, err = http.NewRequestWithContext(ctx, method, fullURL, strings.NewReader(opt.Body))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create request: %w", err)
 		}
-		req.Header.Set("Content-Type", "application/json")
-	} else {
-		// Use the old method with body as string if no payload is provided
-		req, err = http.NewRequestWithContext(ctx, reqType, fullURL, strings.NewReader(p.Body))
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
+	c.credsMu.RLock()
+	req.SetBasicAuth(c.username, c.password)
+	c.credsMu.RUnlock()
 
-	req.SetBasicAuth(c.Username, c.Password)
 	return req, nil
 }
 
-// MakeRequestWithParams takes context, request type, action, and request parameters
-// Returns a new http response for PEClient
-func (c *PEClient) MakeRequestWithParams(ctx context.Context, reqType, action string, p RequestParams) (*http.Response, error) {
-	req, err := c.CreateRequest(ctx, reqType, action, p)
+// MakeRequest executes a request with optional RequestOptions. On a 401/403 it refreshes
+// all credentials and retries once.
+func (c *Client) MakeRequest(ctx context.Context, method, action string, opts ...RequestOptions) (*http.Response, error) {
+	var opt RequestOptions
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+
+	req, err := c.buildRequest(ctx, method, action, opt)
 	if err != nil {
 		return nil, err
 	}
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: c.SkipTLSVerify},
-		},
-		Timeout: c.Timeout,
-	}
-
-	resp, err := client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 
-	return resp, nil
-}
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		_ = resp.Body.Close()
 
-// MakeRequestWithParams takes context, request type, action and request parameters
-// Returns a new http response for PCClient
-func (c *PCClient) MakeRequestWithParams(ctx context.Context, reqType, action string, p RequestParams) (*http.Response, error) {
-	req, err := c.CreateRequest(ctx, reqType, action, p)
-	if err != nil {
-		return nil, err
-	}
+		slog.Warn("Authentication failed, refreshing credentials and retrying", "url", req.URL.String())
+		if refreshErr := c.refreshCreds(); refreshErr != nil {
+			return nil, fmt.Errorf("credential refresh failed: %w", refreshErr)
+		}
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: c.SkipTLSVerify},
-		},
-		Timeout: c.Timeout,
-	}
+		retryReq, err := c.buildRequest(ctx, method, action, opt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build retry request: %w", err)
+		}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("%w", err)
+		resp, err = c.httpClient.Do(retryReq)
+		if err != nil {
+			return nil, fmt.Errorf("retry request failed: %w", err)
+		}
 	}
 
 	return resp, nil
 }
 
-// MakeRequest takes context, request type, and action
-// Returns a new http response
-// Calls MakeRequestWithParams with empty RequestParams for PEClient
-func (c *PEClient) MakeRequest(ctx context.Context, reqType, action string) (*http.Response, error) {
-	return c.MakeRequestWithParams(ctx, reqType, action, RequestParams{})
-}
+// refreshCreds refreshes credentials at most once per second. Concurrent callers block on
+// refreshMu; if a refresh just completed by the time they acquire the lock they return
+// immediately, picking up the credentials the first caller already fetched.
+func (c *Client) refreshCreds() error {
+	c.refreshMu.Lock()
+	defer c.refreshMu.Unlock()
 
-// MakeRequest takes context, request type, and action
-// Returns a new http response
-// Calls MakeRequestWithParams with empty RequestParams for PCClient
-func (c *PCClient) MakeRequest(ctx context.Context, reqType, action string) (*http.Response, error) {
-	return c.MakeRequestWithParams(ctx, reqType, action, RequestParams{})
+	// If another goroutine already refreshed within the last second, skip.
+	if time.Since(c.lastRefresh) < time.Second {
+		return nil
+	}
+
+	if err := c.credProvider.Refresh(); err != nil {
+		return fmt.Errorf("provider refresh failed: %w", err)
+	}
+
+	var username, password string
+	var err error
+
+	if c.isPC {
+		username, password, err = c.credProvider.GetPCCreds(c.clusterName)
+	} else {
+		username, password, err = c.credProvider.GetPECreds(c.clusterName)
+	}
+
+	if username == "" || password == "" {
+		return fmt.Errorf("empty credentials after refresh: %w", err)
+	}
+
+	c.credsMu.Lock()
+	c.username = username
+	c.password = password
+	c.credsMu.Unlock()
+
+	c.lastRefresh = time.Now()
+	return nil
 }
