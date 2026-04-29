@@ -61,7 +61,7 @@ func NewExporter(clusterName string, api nutanix.NutanixClient, apiPath string, 
 
 // valueToFloat64 converts a value to float64. Strings "on"/"off" (case-insensitive)
 // map to 1/0; other strings are parsed as floats.
-func (e *Exporter) valueToFloat64(value any) float64 {
+func valueToFloat64(value any) float64 {
 	switch v := value.(type) {
 	case float64:
 		return v
@@ -85,7 +85,7 @@ func (e *Exporter) valueToFloat64(value any) float64 {
 }
 
 // normalizeKey normalizes given key to lowercase and replaces . and - with _
-func (e *Exporter) normalizeKey(key string) string {
+func normalizeKey(key string) string {
 	return strings.ToLower(strings.NewReplacer(".", "_", "-", "_", ":", "_").Replace(key))
 }
 
@@ -219,7 +219,7 @@ func (e *Exporter) processEntity(ent map[string]any, isCluster bool) {
 	// Iterate over the flattened map and update the metrics
 	for key, value := range flatEntity {
 		// Normalize the key and check if we're collecting this metric
-		normKey := e.normalizeKey(key)
+		normKey := normalizeKey(key)
 		if g, exists := e.metrics[normKey]; exists {
 			// Set label values and update the metric
 			var labelValues []string
@@ -239,7 +239,7 @@ func (e *Exporter) processEntity(ent map[string]any, isCluster bool) {
 					labelValues = []string{e.clusterName, "unknown"}
 				}
 			}
-			g.WithLabelValues(labelValues...).Set(e.valueToFloat64(value))
+			g.WithLabelValues(labelValues...).Set(valueToFloat64(value))
 		}
 	}
 }
@@ -250,10 +250,10 @@ func (e *Exporter) processMetadata(metadata map[string]any) {
 	flatMetadata := e.flattenMap("", metadata)
 	for key, value := range flatMetadata {
 		// Normalize the key and check if we're collecting this metric
-		normKey := e.normalizeKey(key)
+		normKey := normalizeKey(key)
 		if g, exists := e.metrics[normKey]; exists {
 			// Set label values and update the metric
-			g.WithLabelValues(e.clusterName, "N/A").Set(e.valueToFloat64(value))
+			g.WithLabelValues(e.clusterName, "N/A").Set(valueToFloat64(value))
 		}
 	}
 }
