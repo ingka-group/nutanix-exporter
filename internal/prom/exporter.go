@@ -54,9 +54,8 @@ func NewExporter(cluster *nutanix.Cluster, labels []string) *Exporter {
 	}
 }
 
-// valueToFloat64 converts given value to Float64
-// If the value is a string, it will be checked for "on" and "off" and converted to 1 and 0 respectively
-// Otherwise it will be parsed as a float64
+// valueToFloat64 converts a value to float64. Strings "on"/"off" (case-insensitive)
+// map to 1/0; other strings are parsed as floats.
 func (e *Exporter) valueToFloat64(value any) float64 {
 	switch v := value.(type) {
 	case float64:
@@ -64,15 +63,16 @@ func (e *Exporter) valueToFloat64(value any) float64 {
 	case bool:
 		if v {
 			return 1.0
-		} else {
+		}
+		return 0.0
+	case string:
+		if strings.EqualFold(v, "on") {
+			return 1.0
+		}
+		if strings.EqualFold(v, "off") {
 			return 0.0
 		}
-	case string:
-		if v == "on" {
-			return 1.0
-		} else if v == "off" || v == "OFF" {
-			return 0.0
-		} else if f, err := strconv.ParseFloat(v, 64); err == nil {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
 			return f
 		}
 	}
