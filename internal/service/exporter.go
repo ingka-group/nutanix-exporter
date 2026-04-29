@@ -527,8 +527,11 @@ func (es *ExporterService) setupHTTPHandlers() {
 	mux.HandleFunc("/metrics/", es.metricsHandler)
 
 	es.server = &http.Server{
-		Addr:    ListenAddress,
-		Handler: mux,
+		Addr:         ListenAddress,
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 }
 
