@@ -157,21 +157,12 @@ func (e *Exporter) fetchData(ctx context.Context, path string) (result map[strin
 	return result, nil
 }
 
-// initMetrics initializes metrics based on the provided config file and labels.
-func (e *Exporter) initMetrics(configPath string, labelNames []string) error {
-	yamlFile, err := os.ReadFile(configPath)
-	if err != nil {
-		return err
-	}
-
+// initMetrics populates e.metrics from parsed YAML bytes and the subsystem name.
+func (e *Exporter) initMetrics(subsystem string, data []byte, labelNames []string) error {
 	var metrics []MetricConfig
-	err = yaml.Unmarshal(yamlFile, &metrics)
-	if err != nil {
+	if err := yaml.Unmarshal(data, &metrics); err != nil {
 		return err
 	}
-
-	// Use the filename without extension as the subsystem
-	subsystem := strings.TrimSuffix(filepath.Base(configPath), filepath.Ext(configPath))
 
 	for _, m := range metrics {
 		e.metrics[m.Name] = prometheus.NewGaugeVec(
@@ -186,6 +177,16 @@ func (e *Exporter) initMetrics(configPath string, labelNames []string) error {
 	}
 
 	return nil
+}
+
+// initMetricsFromFile reads configPath and delegates to initMetrics.
+func (e *Exporter) initMetricsFromFile(configPath string, labelNames []string) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+	subsystem := strings.TrimSuffix(filepath.Base(configPath), filepath.Ext(configPath))
+	return e.initMetrics(subsystem, data, labelNames)
 }
 
 // updateMetrics processes the JSON structure for hosts and updates the metrics.

@@ -48,7 +48,7 @@ func NewClusterCollector(clusterName string, api nutanix.NutanixClient, configPa
 	exporter := &ClusterExporter{
 		Exporter: NewExporter(clusterName, api, "/v2.0/cluster/", labels),
 	}
-	if err := exporter.initMetrics(configPath, labels); err != nil {
+	if err := exporter.initMetricsFromFile(configPath, labels); err != nil {
 		return nil, err
 	}
 	return exporter, nil
@@ -59,7 +59,7 @@ func NewHostCollector(clusterName string, api nutanix.NutanixClient, configPath 
 	exporter := &HostsExporter{
 		Exporter: NewExporter(clusterName, api, "/v2.0/hosts/", labels),
 	}
-	if err := exporter.initMetrics(configPath, labels); err != nil {
+	if err := exporter.initMetricsFromFile(configPath, labels); err != nil {
 		return nil, err
 	}
 	return exporter, nil
@@ -70,7 +70,7 @@ func NewVMCollector(clusterName string, api nutanix.NutanixClient, configPath st
 	exporter := &VmExporter{
 		Exporter: NewExporter(clusterName, api, "/v2.0/vms/", labels),
 	}
-	if err := exporter.initMetrics(configPath, labels); err != nil {
+	if err := exporter.initMetricsFromFile(configPath, labels); err != nil {
 		return nil, err
 	}
 	return exporter, nil
@@ -81,7 +81,7 @@ func NewVMv1Collector(clusterName string, api nutanix.NutanixClient, configPath 
 	exporter := &Vmv1Exporter{
 		Exporter: NewExporter(clusterName, api, "/v1/vms/", labels),
 	}
-	if err := exporter.initMetrics(configPath, labels); err != nil {
+	if err := exporter.initMetricsFromFile(configPath, labels); err != nil {
 		return nil, err
 	}
 	return exporter, nil
@@ -92,7 +92,7 @@ func NewStorageContainerCollector(clusterName string, api nutanix.NutanixClient,
 	exporter := &StorageContainerExporter{
 		Exporter: NewExporter(clusterName, api, "/v2.0/storage_containers/", labels),
 	}
-	if err := exporter.initMetrics(configPath, labels); err != nil {
+	if err := exporter.initMetricsFromFile(configPath, labels); err != nil {
 		return nil, err
 	}
 	return exporter, nil
