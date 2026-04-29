@@ -120,7 +120,7 @@ func (e *StorageContainerExporter) Collect(ch chan<- prometheus.Metric) {
 
 	e.updateMetrics(result)
 
-	for _, gaugeVec := range e.Metrics {
+	for _, gaugeVec := range e.metrics {
 		gaugeVec.Collect(ch)
 	}
 }
@@ -138,7 +138,7 @@ func (e *ClusterExporter) Collect(ch chan<- prometheus.Metric) {
 
 	e.updateMetrics(result)
 
-	for _, gaugeVec := range e.Metrics {
+	for _, gaugeVec := range e.metrics {
 		gaugeVec.Collect(ch)
 	}
 }
@@ -156,7 +156,7 @@ func (e *HostsExporter) Collect(ch chan<- prometheus.Metric) {
 
 	e.updateMetrics(result)
 
-	for _, gaugeVec := range e.Metrics {
+	for _, gaugeVec := range e.metrics {
 		gaugeVec.Collect(ch)
 	}
 }
@@ -174,7 +174,7 @@ func (e *VmExporter) Collect(ch chan<- prometheus.Metric) {
 
 	e.updateMetrics(result)
 
-	for _, gaugeVec := range e.Metrics {
+	for _, gaugeVec := range e.metrics {
 		gaugeVec.Collect(ch)
 	}
 }
@@ -192,7 +192,7 @@ func (e *Vmv1Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	e.updateMetrics(result)
 
-	for _, gaugeVec := range e.Metrics {
+	for _, gaugeVec := range e.metrics {
 		gaugeVec.Collect(ch)
 	}
 }

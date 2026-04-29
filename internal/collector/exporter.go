@@ -42,8 +42,8 @@ type MetricConfig struct {
 type Exporter struct {
 	clusterName string
 	api         nutanix.NutanixClient
-	Metrics     map[string]*prometheus.GaugeVec
-	Labels      []string
+	metrics     map[string]*prometheus.GaugeVec
+	labels      []string
 }
 
 // NewExporter is the constructor for Exporter
@@ -51,8 +51,8 @@ func NewExporter(clusterName string, api nutanix.NutanixClient, labels []string)
 	return &Exporter{
 		clusterName: clusterName,
 		api:         api,
-		Metrics:     make(map[string]*prometheus.GaugeVec),
-		Labels:      labels,
+		metrics:     make(map[string]*prometheus.GaugeVec),
+		labels:      labels,
 	}
 }
 
@@ -108,7 +108,7 @@ func (e *Exporter) flattenMap(prefix string, nestedMap map[string]any) map[strin
 
 // Describe method required by prometheus.Collector interface
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
-	for _, gaugeVec := range e.Metrics {
+	for _, gaugeVec := range e.metrics {
 		gaugeVec.Describe(ch)
 	}
 }
@@ -154,7 +154,7 @@ func (e *Exporter) initMetrics(configPath string, labelNames []string) error {
 	subsystem := strings.TrimSuffix(filepath.Base(configPath), filepath.Ext(configPath))
 
 	for _, m := range metrics {
-		e.Metrics[m.Name] = prometheus.NewGaugeVec(
+		e.metrics[m.Name] = prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: "nutanix",
 				Subsystem: subsystem,
@@ -200,7 +200,7 @@ func (e *Exporter) processEntity(ent map[string]any, isCluster bool) {
 	for key, value := range flatEntity {
 		// Normalize the key and check if we're collecting this metric
 		normKey := e.normalizeKey(key)
-		if g, exists := e.Metrics[normKey]; exists {
+		if g, exists := e.metrics[normKey]; exists {
 			// Set label values and update the metric
 			var labelValues []string
 
@@ -231,7 +231,7 @@ func (e *Exporter) processMetadata(metadata map[string]any) {
 	for key, value := range flatMetadata {
 		// Normalize the key and check if we're collecting this metric
 		normKey := e.normalizeKey(key)
-		if g, exists := e.Metrics[normKey]; exists {
+		if g, exists := e.metrics[normKey]; exists {
 			// Set label values and update the metric
 			g.WithLabelValues(e.clusterName, "N/A").Set(e.valueToFloat64(value))
 		}
