@@ -28,8 +28,6 @@ import (
 	"time"
 
 	"github.com/ingka-group/nutanix-exporter/internal/auth"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // NutanixClient is the interface implemented by all API clients.
@@ -39,10 +37,9 @@ type NutanixClient interface {
 
 // Cluster represents a Nutanix cluster (Prism Central OR Element).
 type Cluster struct {
-	Name     string
-	URL      string `yaml:"URL"`
-	API      NutanixClient
-	Registry *prometheus.Registry
+	Name string
+	URL  string `yaml:"URL"`
+	API  NutanixClient
 }
 
 // Client is a single HTTP client for either Prism Element or Prism Central.
@@ -94,10 +91,9 @@ func NewCluster(name, rawURL string, ncp auth.CredentialProvider, isPC bool, ski
 	api := newClient(name, rawURL, username, password, ncp, isPC, skipTLSVerify, timeout)
 
 	return &Cluster{
-		Name:     name,
-		URL:      rawURL,
-		API:      api,
-		Registry: prometheus.NewRegistry(),
+		Name: name,
+		URL:  rawURL,
+		API:  api,
 	}
 }
 

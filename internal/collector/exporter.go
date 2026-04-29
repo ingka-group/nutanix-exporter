@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package prom
+package collector
 
 import (
 	"context"
@@ -40,17 +40,19 @@ type MetricConfig struct {
 
 // Exporter is the struct that gets extended by all other exporters
 type Exporter struct {
-	Cluster *nutanix.Cluster                // Reference to the parent Cluster struct
-	Metrics map[string]*prometheus.GaugeVec // Holds the metrics defined by the exporter
-	Labels  []string                        // Common labels for the metrics
+	clusterName string
+	api         nutanix.NutanixClient
+	Metrics     map[string]*prometheus.GaugeVec
+	Labels      []string
 }
 
 // NewExporter is the constructor for Exporter
-func NewExporter(cluster *nutanix.Cluster, labels []string) *Exporter {
+func NewExporter(clusterName string, api nutanix.NutanixClient, labels []string) *Exporter {
 	return &Exporter{
-		Cluster: cluster,
-		Metrics: make(map[string]*prometheus.GaugeVec),
-		Labels:  labels,
+		clusterName: clusterName,
+		api:         api,
+		Metrics:     make(map[string]*prometheus.GaugeVec),
+		Labels:      labels,
 	}
 }
 
@@ -113,7 +115,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 // fetchData makes a GET request to the given path and returns the response body as a map[string]any.
 func (e *Exporter) fetchData(ctx context.Context, path string) (result map[string]any, err error) {
-	resp, err := e.Cluster.API.MakeRequest(ctx, "GET", path)
+	resp, err := e.api.MakeRequest(ctx, "GET", path)
 	if err != nil {
 		return nil, err
 	}
@@ -204,17 +206,17 @@ func (e *Exporter) processEntity(ent map[string]any, isCluster bool) {
 
 			if isCluster {
 				// clustername is the only label for cluster-level metrics
-				labelValues = []string{e.Cluster.Name}
+				labelValues = []string{e.clusterName}
 			} else {
 				// For entity-level metrics, use both cluster name and entity name as labels
 				if name, ok := ent["name"].(string); ok {
-					labelValues = []string{e.Cluster.Name, name}
+					labelValues = []string{e.clusterName, name}
 					// Check for vmname key if name key is not present (used in VMv1 API)
 				} else if name, ok := ent["vmName"].(string); ok {
-					labelValues = []string{e.Cluster.Name, name}
+					labelValues = []string{e.clusterName, name}
 				} else {
 					// Handle case where "name" is missing or not a string
-					labelValues = []string{e.Cluster.Name, "unknown"}
+					labelValues = []string{e.clusterName, "unknown"}
 				}
 			}
 			g.WithLabelValues(labelValues...).Set(e.valueToFloat64(value))
@@ -231,7 +233,7 @@ func (e *Exporter) processMetadata(metadata map[string]any) {
 		normKey := e.normalizeKey(key)
 		if g, exists := e.Metrics[normKey]; exists {
 			// Set label values and update the metric
-			g.WithLabelValues(e.Cluster.Name, "N/A").Set(e.valueToFloat64(value))
+			g.WithLabelValues(e.clusterName, "N/A").Set(e.valueToFloat64(value))
 		}
 	}
 }
