@@ -478,7 +478,10 @@ func (es *ExporterService) parseV4Clusters(result map[string]any) ([]map[string]
 	var clusters []map[string]string
 	unnamedCount := 0
 	for _, item := range data {
-		clusterMap := item.(map[string]any)
+		clusterMap, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
 
 		name, ok := clusterMap["name"].(string)
 		if !ok || name == "" || name == "Unnamed" {
