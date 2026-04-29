@@ -211,12 +211,9 @@ func (es *ExporterService) refreshClusters() error {
 			slog.Error("Failed to init VM v1 collector", "cluster", name, "error", err)
 			continue
 		}
-		collectors := []prometheus.Collector{scCollector, clusterCollector, hostCollector, vmCollector, vmv1Collector}
-
-		for _, collector := range collectors {
+		for _, collector := range []prometheus.Collector{scCollector, clusterCollector, hostCollector, vmCollector, vmv1Collector} {
 			cluster.Registry.MustRegister(collector)
 		}
-		cluster.Collectors = collectors
 
 		newClustersMap[name] = cluster
 	}

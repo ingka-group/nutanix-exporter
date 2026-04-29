@@ -39,12 +39,10 @@ type NutanixClient interface {
 
 // Cluster represents a Nutanix cluster (Prism Central OR Element).
 type Cluster struct {
-	Name       string
-	URL        string `yaml:"URL"`
-	API        NutanixClient
-	Registry   *prometheus.Registry
-	Collectors []prometheus.Collector
-	Mutex      sync.Mutex
+	Name     string
+	URL      string `yaml:"URL"`
+	API      NutanixClient
+	Registry *prometheus.Registry
 }
 
 // Client is a single HTTP client for either Prism Element or Prism Central.
