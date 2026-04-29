@@ -16,14 +16,7 @@ limitations under the License.
 package collector
 
 import (
-	"context"
-	"time"
-
-	"log/slog"
-
 	"github.com/ingka-group/nutanix-exporter/internal/nutanix"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // ----- Type Definitions ----- //
@@ -53,7 +46,7 @@ type StorageContainerExporter struct {
 func NewClusterCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*ClusterExporter, error) {
 	labels := []string{"cluster_name"}
 	exporter := &ClusterExporter{
-		Exporter: NewExporter(clusterName, api, labels),
+		Exporter: NewExporter(clusterName, api, "/v2.0/cluster/", labels),
 	}
 	if err := exporter.initMetrics(configPath, labels); err != nil {
 		return nil, err
@@ -64,7 +57,7 @@ func NewClusterCollector(clusterName string, api nutanix.NutanixClient, configPa
 func NewHostCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*HostsExporter, error) {
 	labels := []string{"cluster_name", "host_name"}
 	exporter := &HostsExporter{
-		Exporter: NewExporter(clusterName, api, labels),
+		Exporter: NewExporter(clusterName, api, "/v2.0/hosts/", labels),
 	}
 	if err := exporter.initMetrics(configPath, labels); err != nil {
 		return nil, err
@@ -75,7 +68,7 @@ func NewHostCollector(clusterName string, api nutanix.NutanixClient, configPath 
 func NewVMCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*VmExporter, error) {
 	labels := []string{"cluster_name", "vm_name"}
 	exporter := &VmExporter{
-		Exporter: NewExporter(clusterName, api, labels),
+		Exporter: NewExporter(clusterName, api, "/v2.0/vms/", labels),
 	}
 	if err := exporter.initMetrics(configPath, labels); err != nil {
 		return nil, err
@@ -86,7 +79,7 @@ func NewVMCollector(clusterName string, api nutanix.NutanixClient, configPath st
 func NewVMv1Collector(clusterName string, api nutanix.NutanixClient, configPath string) (*Vmv1Exporter, error) {
 	labels := []string{"cluster_name", "vm_name"}
 	exporter := &Vmv1Exporter{
-		Exporter: NewExporter(clusterName, api, labels),
+		Exporter: NewExporter(clusterName, api, "/v1/vms/", labels),
 	}
 	if err := exporter.initMetrics(configPath, labels); err != nil {
 		return nil, err
@@ -97,102 +90,10 @@ func NewVMv1Collector(clusterName string, api nutanix.NutanixClient, configPath 
 func NewStorageContainerCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*StorageContainerExporter, error) {
 	labels := []string{"cluster_name", "container_name"}
 	exporter := &StorageContainerExporter{
-		Exporter: NewExporter(clusterName, api, labels),
+		Exporter: NewExporter(clusterName, api, "/v2.0/storage_containers/", labels),
 	}
 	if err := exporter.initMetrics(configPath, labels); err != nil {
 		return nil, err
 	}
 	return exporter, nil
-}
-
-// ----- Collect Methods ----- //
-
-// Collect
-func (e *StorageContainerExporter) Collect(ch chan<- prometheus.Metric) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	result, err := e.fetchData(ctx, "/v2.0/storage_containers/")
-	if err != nil {
-		slog.Error("Error fetching storage container data", "error", err)
-		return
-	}
-
-	e.updateMetrics(result)
-
-	for _, gaugeVec := range e.metrics {
-		gaugeVec.Collect(ch)
-	}
-}
-
-// Collect
-func (e *ClusterExporter) Collect(ch chan<- prometheus.Metric) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	result, err := e.fetchData(ctx, "/v2.0/cluster/")
-	if err != nil {
-		slog.Error("Error fetching cluster data", "error", err)
-		return
-	}
-
-	e.updateMetrics(result)
-
-	for _, gaugeVec := range e.metrics {
-		gaugeVec.Collect(ch)
-	}
-}
-
-// Collect
-func (e *HostsExporter) Collect(ch chan<- prometheus.Metric) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	result, err := e.fetchData(ctx, "/v2.0/hosts/")
-	if err != nil {
-		slog.Error("Error fetching host data", "error", err)
-		return
-	}
-
-	e.updateMetrics(result)
-
-	for _, gaugeVec := range e.metrics {
-		gaugeVec.Collect(ch)
-	}
-}
-
-// Collect
-func (e *VmExporter) Collect(ch chan<- prometheus.Metric) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	result, err := e.fetchData(ctx, "/v2.0/vms/")
-	if err != nil {
-		slog.Error("Error fetching VM data", "error", err)
-		return
-	}
-
-	e.updateMetrics(result)
-
-	for _, gaugeVec := range e.metrics {
-		gaugeVec.Collect(ch)
-	}
-}
-
-// Collect
-func (e *Vmv1Exporter) Collect(ch chan<- prometheus.Metric) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	result, err := e.fetchData(ctx, "/v1/vms/")
-	if err != nil {
-		slog.Error("Error fetching VM v1 data", "error", err)
-		return
-	}
-
-	e.updateMetrics(result)
-
-	for _, gaugeVec := range e.metrics {
-		gaugeVec.Collect(ch)
-	}
 }

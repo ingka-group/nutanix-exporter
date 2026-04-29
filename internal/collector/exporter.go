@@ -19,8 +19,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"os"
+	"time"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -41,15 +43,17 @@ type MetricConfig struct {
 type Exporter struct {
 	clusterName string
 	api         nutanix.NutanixClient
+	apiPath     string
 	metrics     map[string]*prometheus.GaugeVec
 	labels      []string
 }
 
 // NewExporter is the constructor for Exporter
-func NewExporter(clusterName string, api nutanix.NutanixClient, labels []string) *Exporter {
+func NewExporter(clusterName string, api nutanix.NutanixClient, apiPath string, labels []string) *Exporter {
 	return &Exporter{
 		clusterName: clusterName,
 		api:         api,
+		apiPath:     apiPath,
 		metrics:     make(map[string]*prometheus.GaugeVec),
 		labels:      labels,
 	}
@@ -105,10 +109,28 @@ func (e *Exporter) flattenMap(prefix string, nestedMap map[string]any) map[strin
 	return flatMap
 }
 
-// Describe method required by prometheus.Collector interface
+// Describe implements prometheus.Collector.
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	for _, gaugeVec := range e.metrics {
 		gaugeVec.Describe(ch)
+	}
+}
+
+// Collect implements prometheus.Collector.
+func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := e.fetchData(ctx, e.apiPath)
+	if err != nil {
+		slog.Error("Error fetching data", "path", e.apiPath, "cluster", e.clusterName, "error", err)
+		return
+	}
+
+	e.updateMetrics(result)
+
+	for _, gaugeVec := range e.metrics {
+		gaugeVec.Collect(ch)
 	}
 }
 
