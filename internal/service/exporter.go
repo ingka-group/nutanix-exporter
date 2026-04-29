@@ -396,16 +396,31 @@ func (es *ExporterService) parseV3Clusters(result map[string]any) ([]map[string]
 		return nil, 0, fmt.Errorf("unexpected v3 response format: missing 'entities' field")
 	}
 
-	// Extract total count from metadata
-	metadata := result["metadata"].(map[string]any)
-	totalCount := int(metadata["total_matches"].(float64))
+	metadata, ok := result["metadata"].(map[string]any)
+	if !ok {
+		return nil, 0, fmt.Errorf("unexpected v3 response format: missing 'metadata' field")
+	}
+	totalMatches, ok := metadata["total_matches"].(float64)
+	if !ok {
+		return nil, 0, fmt.Errorf("unexpected v3 response format: missing 'total_matches' field")
+	}
+	totalCount := int(totalMatches)
 
 	var clusters []map[string]string
 	unnamedCount := 0
 	for _, entity := range entities {
-		cluster := entity.(map[string]any)
-		spec := cluster["spec"].(map[string]any)
-		status := cluster["status"].(map[string]any)
+		cluster, ok := entity.(map[string]any)
+		if !ok {
+			continue
+		}
+		spec, ok := cluster["spec"].(map[string]any)
+		if !ok {
+			continue
+		}
+		status, ok := cluster["status"].(map[string]any)
+		if !ok {
+			continue
+		}
 
 		name, ok := spec["name"].(string)
 		if !ok || name == "" || name == "Unnamed" {
@@ -413,8 +428,14 @@ func (es *ExporterService) parseV3Clusters(result map[string]any) ([]map[string]
 			continue
 		}
 
-		resources := status["resources"].(map[string]any)
-		network := resources["network"].(map[string]any)
+		resources, ok := status["resources"].(map[string]any)
+		if !ok {
+			continue
+		}
+		network, ok := resources["network"].(map[string]any)
+		if !ok {
+			continue
+		}
 		ip, ok := network["external_ip"].(string)
 		if !ok || ip == "" {
 			continue
@@ -426,7 +447,6 @@ func (es *ExporterService) parseV3Clusters(result map[string]any) ([]map[string]
 		})
 	}
 
-	// Adjust total count to exclude unnamed clusters
 	return clusters, totalCount - unnamedCount, nil
 }
 
@@ -436,9 +456,15 @@ func (es *ExporterService) parseV4Clusters(result map[string]any) ([]map[string]
 		return nil, 0, fmt.Errorf("unexpected v4 response format: missing 'data' field")
 	}
 
-	// Extract total count from metadata
-	metadata := result["metadata"].(map[string]any)
-	totalCount := int(metadata["totalAvailableResults"].(float64))
+	metadata, ok := result["metadata"].(map[string]any)
+	if !ok {
+		return nil, 0, fmt.Errorf("unexpected v4 response format: missing 'metadata' field")
+	}
+	totalAvailable, ok := metadata["totalAvailableResults"].(float64)
+	if !ok {
+		return nil, 0, fmt.Errorf("unexpected v4 response format: missing 'totalAvailableResults' field")
+	}
+	totalCount := int(totalAvailable)
 
 	var clusters []map[string]string
 	unnamedCount := 0
