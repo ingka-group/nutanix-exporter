@@ -50,10 +50,10 @@ type StorageContainerExporter struct {
 
 // ----- Constructors ----- //
 
-func NewClusterCollector(cluster *nutanix.Cluster, configPath string) (*ClusterExporter, error) {
+func NewClusterCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*ClusterExporter, error) {
 	labels := []string{"cluster_name"}
 	exporter := &ClusterExporter{
-		Exporter: NewExporter(cluster.Name, cluster.API, labels),
+		Exporter: NewExporter(clusterName, api, labels),
 	}
 	if err := exporter.initMetrics(configPath, labels); err != nil {
 		return nil, err
@@ -61,10 +61,10 @@ func NewClusterCollector(cluster *nutanix.Cluster, configPath string) (*ClusterE
 	return exporter, nil
 }
 
-func NewHostCollector(cluster *nutanix.Cluster, configPath string) (*HostsExporter, error) {
+func NewHostCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*HostsExporter, error) {
 	labels := []string{"cluster_name", "host_name"}
 	exporter := &HostsExporter{
-		Exporter: NewExporter(cluster.Name, cluster.API, labels),
+		Exporter: NewExporter(clusterName, api, labels),
 	}
 	if err := exporter.initMetrics(configPath, labels); err != nil {
 		return nil, err
@@ -72,10 +72,10 @@ func NewHostCollector(cluster *nutanix.Cluster, configPath string) (*HostsExport
 	return exporter, nil
 }
 
-func NewVMCollector(cluster *nutanix.Cluster, configPath string) (*VmExporter, error) {
+func NewVMCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*VmExporter, error) {
 	labels := []string{"cluster_name", "vm_name"}
 	exporter := &VmExporter{
-		Exporter: NewExporter(cluster.Name, cluster.API, labels),
+		Exporter: NewExporter(clusterName, api, labels),
 	}
 	if err := exporter.initMetrics(configPath, labels); err != nil {
 		return nil, err
@@ -83,10 +83,10 @@ func NewVMCollector(cluster *nutanix.Cluster, configPath string) (*VmExporter, e
 	return exporter, nil
 }
 
-func NewVMv1Collector(cluster *nutanix.Cluster, configPath string) (*Vmv1Exporter, error) {
+func NewVMv1Collector(clusterName string, api nutanix.NutanixClient, configPath string) (*Vmv1Exporter, error) {
 	labels := []string{"cluster_name", "vm_name"}
 	exporter := &Vmv1Exporter{
-		Exporter: NewExporter(cluster.Name, cluster.API, labels),
+		Exporter: NewExporter(clusterName, api, labels),
 	}
 	if err := exporter.initMetrics(configPath, labels); err != nil {
 		return nil, err
@@ -94,10 +94,10 @@ func NewVMv1Collector(cluster *nutanix.Cluster, configPath string) (*Vmv1Exporte
 	return exporter, nil
 }
 
-func NewStorageContainerCollector(cluster *nutanix.Cluster, configPath string) (*StorageContainerExporter, error) {
+func NewStorageContainerCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*StorageContainerExporter, error) {
 	labels := []string{"cluster_name", "container_name"}
 	exporter := &StorageContainerExporter{
-		Exporter: NewExporter(cluster.Name, cluster.API, labels),
+		Exporter: NewExporter(clusterName, api, labels),
 	}
 	if err := exporter.initMetrics(configPath, labels); err != nil {
 		return nil, err

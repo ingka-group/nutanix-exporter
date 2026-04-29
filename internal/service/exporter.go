@@ -195,27 +195,27 @@ func (es *ExporterService) refreshClusters() error {
 		registry := prometheus.NewRegistry()
 
 		slog.Info("Registering collectors for cluster", "name", name)
-		scCollector, err := collector.NewStorageContainerCollector(cluster, es.config.ConfigPath+"/storage_container.yaml")
+		scCollector, err := collector.NewStorageContainerCollector(cluster.Name, cluster.API, es.config.ConfigPath+"/storage_container.yaml")
 		if err != nil {
 			slog.Error("Failed to init storage container collector", "cluster", name, "error", err)
 			continue
 		}
-		clusterCollector, err := collector.NewClusterCollector(cluster, es.config.ConfigPath+"/cluster.yaml")
+		clusterCollector, err := collector.NewClusterCollector(cluster.Name, cluster.API, es.config.ConfigPath+"/cluster.yaml")
 		if err != nil {
 			slog.Error("Failed to init cluster collector", "cluster", name, "error", err)
 			continue
 		}
-		hostCollector, err := collector.NewHostCollector(cluster, es.config.ConfigPath+"/host.yaml")
+		hostCollector, err := collector.NewHostCollector(cluster.Name, cluster.API, es.config.ConfigPath+"/host.yaml")
 		if err != nil {
 			slog.Error("Failed to init host collector", "cluster", name, "error", err)
 			continue
 		}
-		vmCollector, err := collector.NewVMCollector(cluster, es.config.ConfigPath+"/vm.yaml")
+		vmCollector, err := collector.NewVMCollector(cluster.Name, cluster.API, es.config.ConfigPath+"/vm.yaml")
 		if err != nil {
 			slog.Error("Failed to init VM collector", "cluster", name, "error", err)
 			continue
 		}
-		vmv1Collector, err := collector.NewVMv1Collector(cluster, es.config.ConfigPath+"/vm_v1.yaml")
+		vmv1Collector, err := collector.NewVMv1Collector(cluster.Name, cluster.API, es.config.ConfigPath+"/vm_v1.yaml")
 		if err != nil {
 			slog.Error("Failed to init VM v1 collector", "cluster", name, "error", err)
 			continue
