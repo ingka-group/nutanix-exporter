@@ -35,13 +35,6 @@ type NutanixClient interface {
 	MakeRequest(ctx context.Context, method, action string, opts ...RequestOptions) (*http.Response, error)
 }
 
-// Cluster represents a Nutanix cluster (Prism Central OR Element).
-type Cluster struct {
-	Name string
-	URL  string `yaml:"URL"`
-	API  NutanixClient
-}
-
 // Client is a single HTTP client for either Prism Element or Prism Central.
 // The basePath field captures the URL-prefix difference between the two:
 //   - PE: "/PrismGateway/services/rest"
@@ -56,8 +49,8 @@ type Client struct {
 	isPC         bool
 	httpClient   *http.Client
 	credsMu      sync.RWMutex
-	refreshMu    sync.Mutex  // serialises refreshCreds; only one goroutine refreshes at a time
-	lastRefresh  time.Time   // others that arrive after a recent refresh skip calling it again
+	refreshMu    sync.Mutex // serialises refreshCreds; only one goroutine refreshes at a time
+	lastRefresh  time.Time  // others that arrive after a recent refresh skip calling it again
 }
 
 // RequestOptions holds optional components for a request.
@@ -65,36 +58,6 @@ type RequestOptions struct {
 	Params  url.Values
 	Payload any
 	Body    string
-}
-
-// NewCluster returns a new Nutanix Cluster, fetching credentials and constructing the API client.
-// Returns nil if credentials cannot be obtained.
-func NewCluster(name, rawURL string, ncp auth.CredentialProvider, isPC bool, skipTLSVerify bool, timeout time.Duration) *Cluster {
-	var username, password string
-	var err error
-
-	if isPC {
-		username, password, err = ncp.GetPCCreds(name)
-	} else {
-		username, password, err = ncp.GetPECreds(name)
-	}
-
-	if username == "" || password == "" {
-		kind := "Prism Element"
-		if isPC {
-			kind = "Prism Central"
-		}
-		slog.Error("Failed to get credentials", "kind", kind, "name", name, "error", err)
-		return nil
-	}
-
-	api := newClient(name, rawURL, username, password, ncp, isPC, skipTLSVerify, timeout)
-
-	return &Cluster{
-		Name: name,
-		URL:  rawURL,
-		API:  api,
-	}
 }
 
 // newClient constructs a Client. basePath is set based on whether this targets PE or PC.
