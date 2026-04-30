@@ -78,19 +78,19 @@ func FetchClusters(ctx context.Context, client NutanixClient, apiVersion, prefix
 	switch apiVersion {
 	case "v3":
 		makeRequest = func(ctx context.Context, page int) (*http.Response, error) {
-			return makeV3Request(ctx, client, page)
+			return fetchClustersV3(ctx, client, page)
 		}
-		parseClusters = parseV3Clusters
+		parseClusters = parseClustersV3
 	case "v4b1":
 		makeRequest = func(ctx context.Context, page int) (*http.Response, error) {
-			return makeV4b1Request(ctx, client, page)
+			return fetchClustersV4b1(ctx, client, page)
 		}
-		parseClusters = parseV4Clusters
+		parseClusters = parseClustersV4
 	default: // v4
 		makeRequest = func(ctx context.Context, page int) (*http.Response, error) {
-			return makeV4Request(ctx, client, page)
+			return fetchClustersV4(ctx, client, page)
 		}
-		parseClusters = parseV4Clusters
+		parseClusters = parseClustersV4
 	}
 
 	clusterData := make(map[string]string)
@@ -190,7 +190,7 @@ func FetchClusters(ctx context.Context, client NutanixClient, apiVersion, prefix
 	return clusterData, nil
 }
 
-func makeV3Request(ctx context.Context, client NutanixClient, page int) (*http.Response, error) {
+func fetchClustersV3(ctx context.Context, client NutanixClient, page int) (*http.Response, error) {
 	return client.MakeRequest(ctx, "POST", "/api/nutanix/v3/clusters/list", RequestOptions{
 		Payload: map[string]any{
 			"kind":   "cluster",
@@ -200,7 +200,7 @@ func makeV3Request(ctx context.Context, client NutanixClient, page int) (*http.R
 	})
 }
 
-func makeV4Request(ctx context.Context, client NutanixClient, page int) (*http.Response, error) {
+func fetchClustersV4(ctx context.Context, client NutanixClient, page int) (*http.Response, error) {
 	return client.MakeRequest(ctx, "GET", "/api/clustermgmt/v4.0/config/clusters", RequestOptions{
 		Params: url.Values{
 			"$limit":   []string{"100"},
@@ -210,7 +210,7 @@ func makeV4Request(ctx context.Context, client NutanixClient, page int) (*http.R
 	})
 }
 
-func makeV4b1Request(ctx context.Context, client NutanixClient, page int) (*http.Response, error) {
+func fetchClustersV4b1(ctx context.Context, client NutanixClient, page int) (*http.Response, error) {
 	return client.MakeRequest(ctx, "GET", "/api/clustermgmt/v4.0.b1/config/clusters", RequestOptions{
 		Params: url.Values{
 			"$limit":   []string{"100"},
@@ -220,7 +220,7 @@ func makeV4b1Request(ctx context.Context, client NutanixClient, page int) (*http
 	})
 }
 
-func parseV3Clusters(result map[string]any) ([]map[string]string, int, error) {
+func parseClustersV3(result map[string]any) ([]map[string]string, int, error) {
 	entities, ok := result["entities"].([]any)
 	if !ok {
 		return nil, 0, fmt.Errorf("unexpected v3 response format: missing 'entities' field")
@@ -280,7 +280,7 @@ func parseV3Clusters(result map[string]any) ([]map[string]string, int, error) {
 	return clusters, totalCount - unnamedCount, nil
 }
 
-func parseV4Clusters(result map[string]any) ([]map[string]string, int, error) {
+func parseClustersV4(result map[string]any) ([]map[string]string, int, error) {
 	data, ok := result["data"].([]any)
 	if !ok {
 		return nil, 0, fmt.Errorf("unexpected v4 response format: missing 'data' field")
