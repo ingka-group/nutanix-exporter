@@ -17,7 +17,6 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -108,7 +107,7 @@ func (v *VaultCredentialProvider) GetPECreds(cluster string) (string, string, er
 	return v.getCreds(cluster, v.peTaskAccount, v.engineName)
 }
 
-// GetCreds retrieves the credentials for a given cluster, path, and engine.
+// getCreds retrieves the credentials for a given cluster, path, and engine.
 func (v *VaultCredentialProvider) getCreds(cluster, path, engine string) (string, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
@@ -118,18 +117,13 @@ func (v *VaultCredentialProvider) getCreds(cluster, path, engine string) (string
 		return "", "", fmt.Errorf("failed to read secret: %w", err)
 	}
 
-	jsonData, err := json.Marshal(vaultResponse.Data.Data)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to marshal secret data: %w", err)
+	data := vaultResponse.Data.Data
+	username, _ := data["username"].(string)
+	secret, _ := data["secret"].(string)
+
+	if username == "" || secret == "" {
+		return "", "", fmt.Errorf("missing username or secret in vault response for cluster %s", cluster)
 	}
 
-	var vaultSecret struct {
-		Username string `json:"username"`
-		Secret   string `json:"secret"`
-	}
-	if err := json.Unmarshal(jsonData, &vaultSecret); err != nil {
-		return "", "", fmt.Errorf("failed to parse secret data: %w", err)
-	}
-
-	return vaultSecret.Username, vaultSecret.Secret, nil
+	return username, secret, nil
 }
