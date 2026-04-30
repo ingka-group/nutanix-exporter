@@ -47,3 +47,4 @@ Thank you for your contributions!
 - Functions and variables must be preceded by a comment that describes them, starting with the function/var name (IntelliSense/GoDoc)
 - Code should be formatted with `gofmt` before committing
 - Code must pass `golangci-lint` before committing (run `make lint`). Linting is enforced as part of the CI workflow on all PRs to `main`.
+- All tests must be passing before committing (run `make test`). Tests are enforced as part of the CI workflow on all PRs to `main`.
