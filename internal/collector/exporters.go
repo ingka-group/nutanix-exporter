@@ -19,81 +19,47 @@ import (
 	"github.com/ingka-group/nutanix-exporter/internal/nutanix"
 )
 
-// ----- Type Definitions ----- //
-
-type ClusterExporter struct {
-	*Exporter
-}
-
-type HostsExporter struct {
-	*Exporter
-}
-
-type VmExporter struct {
-	*Exporter
-}
-
-type Vmv1Exporter struct {
-	*Exporter
-}
-
-type StorageContainerExporter struct {
-	*Exporter
-}
-
-// ----- Constructors ----- //
-
-func NewClusterCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*ClusterExporter, error) {
+func NewClusterCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*Exporter, error) {
 	labels := []string{"cluster_name"}
-	exporter := &ClusterExporter{
-		Exporter: NewExporter(clusterName, api, "/v2.0/cluster/", labels),
-	}
-	if err := exporter.initMetricsFromFile(configPath, labels); err != nil {
+	e := NewExporter(clusterName, api, "/v2.0/cluster/", labels)
+	if err := e.initMetricsFromFile(configPath, labels); err != nil {
 		return nil, err
 	}
-	return exporter, nil
+	return e, nil
 }
 
-func NewHostCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*HostsExporter, error) {
+func NewHostCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*Exporter, error) {
 	labels := []string{"cluster_name", "host_name"}
-	exporter := &HostsExporter{
-		Exporter: NewExporter(clusterName, api, "/v2.0/hosts/", labels),
-	}
-	if err := exporter.initMetricsFromFile(configPath, labels); err != nil {
+	e := NewExporter(clusterName, api, "/v2.0/hosts/", labels)
+	if err := e.initMetricsFromFile(configPath, labels); err != nil {
 		return nil, err
 	}
-	return exporter, nil
+	return e, nil
 }
 
-func NewVMCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*VmExporter, error) {
+func NewVMCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*Exporter, error) {
 	labels := []string{"cluster_name", "vm_name"}
-	exporter := &VmExporter{
-		Exporter: NewExporter(clusterName, api, "/v2.0/vms/", labels),
-	}
-	if err := exporter.initMetricsFromFile(configPath, labels); err != nil {
+	e := NewExporter(clusterName, api, "/v2.0/vms/", labels)
+	if err := e.initMetricsFromFile(configPath, labels); err != nil {
 		return nil, err
 	}
-	return exporter, nil
+	return e, nil
 }
 
-func NewVMv1Collector(clusterName string, api nutanix.NutanixClient, configPath string) (*Vmv1Exporter, error) {
+func NewVMv1Collector(clusterName string, api nutanix.NutanixClient, configPath string) (*Exporter, error) {
 	labels := []string{"cluster_name", "vm_name"}
-	exporter := &Vmv1Exporter{
-		Exporter: NewExporter(clusterName, api, "/v1/vms/", labels),
-	}
-	if err := exporter.initMetricsFromFile(configPath, labels); err != nil {
+	e := NewExporter(clusterName, api, "/v1/vms/", labels)
+	if err := e.initMetricsFromFile(configPath, labels); err != nil {
 		return nil, err
 	}
-	return exporter, nil
+	return e, nil
 }
 
-func NewStorageContainerCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*StorageContainerExporter, error) {
+func NewStorageContainerCollector(clusterName string, api nutanix.NutanixClient, configPath string) (*Exporter, error) {
 	labels := []string{"cluster_name", "container_name"}
-	exporter := &StorageContainerExporter{
-		Exporter: NewExporter(clusterName, api, "/v2.0/storage_containers/", labels),
-	}
-	if err := exporter.initMetricsFromFile(configPath, labels); err != nil {
+	e := NewExporter(clusterName, api, "/v2.0/storage_containers/", labels)
+	if err := e.initMetricsFromFile(configPath, labels); err != nil {
 		return nil, err
 	}
-	return exporter, nil
+	return e, nil
 }
