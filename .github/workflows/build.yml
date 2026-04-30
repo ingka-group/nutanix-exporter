@@ -31,7 +31,7 @@ jobs:
         version: v2.11.4
 
     - name: Go Test
-      run: go test -v ./...
+      run: go test -race -v ./...
       
     - name: Go Build
       run: |
