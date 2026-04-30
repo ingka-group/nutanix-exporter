@@ -37,6 +37,8 @@ The Nutanix Exporter is a Go application that fetches live data from any number 
     - `PE_USERNAME_CLUSTER_NAME`
     - `PE_PASSWORD_CLUSTER_NAME`
 
+    **Note:** consecutive non-alphanumeric characters are collapsed into a single underscore. For example, `cluster--name` and `cluster-name` both map to `PE_USERNAME_CLUSTER_NAME`.
+
 ### Metrics Configuration
 
 Metrics are collected from the Prism Element v2.0 APIs. Currently, the exporter supports the following endpoints:
