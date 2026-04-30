@@ -209,7 +209,7 @@ func Test_MakeRequest_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MakeRequest() unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("StatusCode = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -235,7 +235,7 @@ func Test_MakeRequest_401_RefreshAndRetry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MakeRequest() unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("StatusCode = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -264,7 +264,7 @@ func Test_MakeRequest_403_RefreshAndRetry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MakeRequest() unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("StatusCode = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -285,7 +285,10 @@ func Test_MakeRequest_401_NoRetryOnRefreshError(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}, creds)
 
-	_, err := c.MakeRequest(context.Background(), "GET", "/api/clusters")
+	resp, err := c.MakeRequest(context.Background(), "GET", "/api/clusters")
+	if resp != nil {
+		resp.Body.Close() //nolint:errcheck
+	}
 	if err == nil {
 		t.Fatal("MakeRequest() expected error on refresh failure, got nil")
 	}
@@ -317,7 +320,7 @@ func Test_MakeRequest_RefreshUpdatesCredentials(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MakeRequest() unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	staleReq := &http.Request{Header: http.Header{}}
 	staleReq.SetBasicAuth("staleuser", "stalepass")
