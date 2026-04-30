@@ -22,6 +22,8 @@ import (
 	"strings"
 )
 
+var nonAlphanumeric = regexp.MustCompile(`[^A-Z0-9_]+`)
+
 // EnvCredentialProvider implements the methods for getting Nutanix
 // cluster authentication credentials from environment variables.
 type EnvCredentialProvider struct{}
@@ -79,7 +81,5 @@ func (e *EnvCredentialProvider) GetPECreds(cluster string) (string, string, erro
 
 // convertClusterName converts the cluster name to uppercase and replaces non-alphanumeric characters with underscores.
 func (e *EnvCredentialProvider) convertClusterName(cluster string) string {
-	cluster = strings.ToUpper(cluster)
-	r, _ := regexp.Compile("[^A-Z0-9_]+")
-	return r.ReplaceAllString(cluster, "_")
+	return nonAlphanumeric.ReplaceAllString(strings.ToUpper(cluster), "_")
 }
