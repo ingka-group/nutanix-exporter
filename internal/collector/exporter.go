@@ -18,7 +18,6 @@ package collector
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 
 	"os"
@@ -121,9 +120,25 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	result, err := e.fetchData(ctx, e.apiPath)
+	resp, err := e.api.MakeRequest(ctx, "GET", e.apiPath)
 	if err != nil {
 		slog.Error("Error fetching data", "path", e.apiPath, "cluster", e.clusterName, "error", err)
+		return
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			slog.Error("Error closing response body", "path", e.apiPath, "cluster", e.clusterName, "error", cerr)
+		}
+	}()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		slog.Error("Error fetching data", "path", e.apiPath, "cluster", e.clusterName, "status", resp.Status)
+		return
+	}
+
+	var result map[string]any
+	if err = json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		slog.Error("Error decoding response", "path", e.apiPath, "cluster", e.clusterName, "error", err)
 		return
 	}
 
@@ -132,29 +147,6 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	for _, gaugeVec := range e.metrics {
 		gaugeVec.Collect(ch)
 	}
-}
-
-// fetchData makes a GET request to the given path and returns the response body as a map[string]any.
-func (e *Exporter) fetchData(ctx context.Context, path string) (result map[string]any, err error) {
-	resp, err := e.api.MakeRequest(ctx, "GET", path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if cerr := resp.Body.Close(); cerr != nil && err == nil {
-			err = cerr
-		}
-	}()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("request failed: %s", resp.Status)
-	}
-
-	if err = json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response body: %w", err)
-	}
-
-	return result, nil
 }
 
 // initMetrics populates e.metrics from parsed YAML bytes and the subsystem name.
