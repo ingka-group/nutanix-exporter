@@ -97,8 +97,8 @@ func Test_setupHTTPHandlers(t *testing.T) {
 	if es.server == nil {
 		t.Fatal("setupHTTPHandlers() left server nil")
 	}
-	if es.server.Addr != ListenAddress {
-		t.Errorf("server.Addr = %q, want %q", es.server.Addr, ListenAddress)
+	if es.server.Addr != es.config.ListenAddress {
+		t.Errorf("server.Addr = %q, want %q", es.server.Addr, es.config.ListenAddress)
 	}
 	if es.server.ReadTimeout != 10*time.Second {
 		t.Errorf("server.ReadTimeout = %v, want 10s", es.server.ReadTimeout)

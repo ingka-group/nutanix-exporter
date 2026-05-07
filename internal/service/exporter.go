@@ -32,8 +32,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-const ListenAddress = ":9408"
-
 // clusterEntry pairs a Nutanix cluster with its dedicated Prometheus registry.
 // Keeping the registry here rather than on nutanix.Cluster means the HTTP client
 // layer has no Prometheus dependency.
@@ -83,7 +81,7 @@ func (es *ExporterService) StartWithServer(ctx context.Context, startHTTPServer 
 
 		// Start server
 		go func() {
-			slog.Info("Starting server", "address", ListenAddress)
+			slog.Info("Starting server", "address", es.config.ListenAddress)
 			if err := es.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				slog.Error("Server error", "error", err)
 			}
@@ -251,7 +249,7 @@ func (es *ExporterService) setupHTTPHandlers() {
 	mux.HandleFunc("/metrics/", es.metricsHandler)
 
 	es.server = &http.Server{
-		Addr:         ListenAddress,
+		Addr:         es.config.ListenAddress,
 		Handler:      mux,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,

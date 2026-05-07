@@ -21,6 +21,7 @@ type Config struct {
 	PETaskAccount          string        `env:"PE_TASK_ACCOUNT"`
 	PCTaskAccount          string        `env:"PC_TASK_ACCOUNT"`
 	ConfigPath             string        `env:"CONFIG_PATH" envDefault:"./configs"`
+	ListenAddress          string        `env:"EXPORTER_LISTEN_ADDRESS" envDefault:":9408"`
 }
 
 func NewConfig() (*Config, error) {
