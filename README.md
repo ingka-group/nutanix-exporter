@@ -99,6 +99,7 @@ Example exporter.env:
 PC_CLUSTER_NAME='Prism Central' (Required, can be any value, letters a-z,A-Z, numbers 0-9, underscores (_), space ( ) and dash (-))
 PC_CLUSTER_URL=https://your-pc-cluster.yourdomain.com:9440 (Required, the full URL to Prism Central)
 PC_API_VERSION=v3 (Optional, defaults to v4. Supports v3, v4b1, v4)
+EXPORTER_LISTEN_ADDRESS=:9408 (Optional, defaults to :9408. Address and port the exporter listens on)
 CLUSTER_REFRESH_INTERVAL=1800 (Optional, defaults to 30 minutes, value is in seconds)
 CLUSTER_PREFIX=optional-cluster-prefix (Optional, prefix to filter cluster names)
 CONFIG_PATH=/etc/prometheus-nutanix-exporter/ (Optional, defaults to `./configs`)
