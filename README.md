@@ -229,4 +229,4 @@ If you have any other issues or questions regarding this project, feel free to c
 
 ## Licence
 
-Versions 1.11.0 and below of this project are open source under the "GPLv2 License". Version 1.11.1 and above are licensed under the "GPLv3 License", read the [LICENCE](./LICENCE.md) terms for more details.
+As of version 1.11.1, this project is licensed under the "GPLv3 License", , read the [LICENCE](./LICENCE.md) terms for more details. Previous versions (1.11.0 and below) of this project are licensed under the "GPLv2 License".
