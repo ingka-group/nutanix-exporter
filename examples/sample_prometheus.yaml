@@ -10,16 +10,42 @@ scrape_configs:
     static_configs:
       - targets: ["grafana:3000"]
 
-# One job per cluster
+# One job for every Nutanix cluster.
+#
+# The exporter serves the clusters it discovered from Prism Central at /sd, in
+# Prometheus http_sd format. Each entry carries a __metrics_path__ label, so all
+# targets share the exporter's address and differ only by path. Prometheus keys
+# targets on the full label set, so these stay distinct.
+#
+# refresh_interval only controls how often Prometheus re-reads /sd. The list
+# itself is refreshed by the exporter on CLUSTER_REFRESH_INTERVAL (default 30m),
+# so a shorter value here just re-reads the same data.
 
-  - job_name: "nutanix_exporter[$CLUSTER_NAME]"
-    metrics_path: "/metrics/$CLUSTER_NAME"
-    static_configs:
-      - targets: ["NutanixExporter:9408"]
+  - job_name: "nutanix"
+    http_sd_configs:
+      - url: "http://NutanixExporter:9408/sd"
+        refresh_interval: 5m
 
-# PC also gets its own "cluster"
+# The exporter already sets the instance label to the cluster name. Relabel from
+# __meta_nutanix_cluster instead if you want a different value, for example to
+# add an environment prefix:
+#
+#   relabel_configs:
+#     - source_labels: [__meta_nutanix_cluster]
+#       target_label: instance
+#       replacement: "prod/$1"
 
-  - job_name: "nutanix_exporter[$PC_CLUSTER_NAME]"
-    metrics_path: "/metrics/$PC_CLUSTER_NAME"
-    static_configs:
-      - targets: ["NutanixExporter:9408"]
+# When the exporter is served over TLS or behind basic auth (see
+# --web.config.file), the discovery request needs matching client settings:
+#
+#   - job_name: "nutanix"
+#     http_sd_configs:
+#       - url: "https://NutanixExporter:9408/sd"
+#         refresh_interval: 5m
+#         basic_auth:
+#           username: prometheus
+#           password: <password>
+#     scheme: https
+#     basic_auth:
+#       username: prometheus
+#       password: <password>

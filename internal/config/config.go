@@ -38,6 +38,7 @@ type Config struct {
 	PCTaskAccount          string        `env:"PC_TASK_ACCOUNT"`
 	ConfigPath             string        `env:"CONFIG_PATH" envDefault:"./configs"`
 	ListenAddress          string        `env:"EXPORTER_LISTEN_ADDRESS" envDefault:":9408"`
+	SDTargetAddress        string        `env:"EXPORTER_SD_TARGET" envDefault:""`
 }
 
 func NewConfig() (*Config, error) {

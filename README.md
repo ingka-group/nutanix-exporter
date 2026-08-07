@@ -12,6 +12,7 @@ The Nutanix Exporter is a Go application that fetches live data from any number 
 - Support for reading cluster credentials from environment variables
 - Parent Exporter class that can be extended for any APIv2 endpoint
 - Per cluster metrics exposed at `/metrics/cluster-name`
+- Prometheus HTTP service discovery at `/sd`, removing the need for a hand-maintained cluster list
 - Optional filtering by cluster name prefix
 - Optional exclusion of the Prism Central appliance from the discovered cluster list
 - TLS encryption and HTTP basic authentication via [exporter-toolkit web configuration](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md)
@@ -53,6 +54,57 @@ level=WARN msg="Failed to initialize cluster" name=ProdCentral-NXP000
 ```
 
 Set `SKIP_PC_APPLIANCE=true` to exclude it. The appliance is identified by the cluster function Prism Central reports for it (`clusterFunction` on v4, `service_list` on v3), not by name. The default is `false` to preserve existing behaviour; if a response omits that field the cluster is kept rather than dropped.
+
+### Prometheus Service Discovery
+
+Because the cluster list is discovered at runtime, Prometheus should not have to maintain its own copy of it. The exporter serves the clusters it knows about at `/sd` in [http_sd](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#http_sd_config) format, which replaces one hand-written scrape job per cluster with a single job:
+
+```yaml
+  - job_name: "nutanix"
+    http_sd_configs:
+      - url: "http://nutanix-exporter:9408/sd"
+        refresh_interval: 5m
+```
+
+Every cluster is served from the same exporter address and distinguished by the `__metrics_path__` label, which points at that cluster's `/metrics/<cluster-name>` endpoint. Prometheus keys targets on the full label set, so targets sharing an address remain distinct. A response looks like:
+
+```json
+[
+  {
+    "targets": ["nutanix-exporter:9408"],
+    "labels": {
+      "__metrics_path__": "/metrics/ProdSite1-NXC000",
+      "__meta_nutanix_cluster": "ProdSite1-NXC000",
+      "instance": "ProdSite1-NXC000"
+    }
+  }
+]
+```
+
+`instance` is set explicitly. Left to default, Prometheus derives it from the target address, and since every cluster shares one address they would all collide on a single instance value, making `up` and `scrape_duration_seconds` impossible to attribute to a cluster. Relabel from `__meta_nutanix_cluster` if you want a different value.
+
+A full example, including the client settings needed when the exporter is behind TLS or basic auth, is in [examples/sample_prometheus.yaml](./examples/sample_prometheus.yaml).
+
+#### Target address
+
+By default each target is advertised using the `Host` of the discovery request. Set `EXPORTER_SD_TARGET` when the scrape address should differ from the discovery address, for example behind a proxy that terminates on a different hostname.
+
+#### Refresh intervals
+
+`refresh_interval` controls only how often Prometheus re-reads `/sd`. The list behind it is refreshed by the exporter on `CLUSTER_REFRESH_INTERVAL` (default 30 minutes), so a shorter `refresh_interval` re-reads the same data and a newly added cluster will not appear until the exporter's own refresh runs. Keep `refresh_interval` at or above `CLUSTER_REFRESH_INTERVAL` unless you have a reason to poll more often.
+
+#### Cluster names in paths
+
+Cluster names are URL-escaped when building `__metrics_path__`, so names containing spaces or other characters that are not URL-safe still resolve correctly. Names remain easiest to work with when limited to letters, numbers, dots, dashes and underscores, since they also appear in the `cluster_name` metric label and in the `PE_USERNAME_<CLUSTERNAME>` environment variables described above.
+
+#### Scraping every cluster in one request
+
+The `pkg/exporter` package also exposes `GetHandler()`, which merges every cluster's registry into a single combined scrape. It is convenient when embedding the exporter with a small number of clusters, but it does not scale:
+
+- All clusters are collected in one request, so one slow or unreachable cluster delays the response and can push it past the server's write timeout, costing every other cluster its data point.
+- A single scrape carries a single `up` value, so a failure cannot be attributed to a cluster.
+
+Per-cluster scraping through service discovery avoids both: Prometheus scrapes the clusters in parallel as independent targets, and a broken cluster fails only its own target. Embedders that want this behaviour without running the built-in HTTP server can mount `GetMetricsHandler()` on `/metrics/` and `GetServiceDiscoveryHandler()` on `/sd`.
 
 ### Metrics Configuration
 
@@ -115,6 +167,7 @@ PC_CLUSTER_NAME='Prism Central' (Required, can be any value, letters a-z,A-Z, nu
 PC_CLUSTER_URL=https://your-pc-cluster.yourdomain.com:9440 (Required, the full URL to Prism Central)
 PC_API_VERSION=v3 (Optional, defaults to v4. Supports v3, v4b1, v4)
 EXPORTER_LISTEN_ADDRESS=:9408 (Optional, defaults to :9408. Address and port the exporter listens on)
+EXPORTER_SD_TARGET=nutanix-exporter:9408 (Optional. Address advertised to Prometheus by /sd, defaults to the Host of the discovery request)
 CLUSTER_REFRESH_INTERVAL=1800 (Optional, defaults to 30 minutes, value is in seconds)
 CLUSTER_PREFIX=optional-cluster-prefix (Optional, prefix to filter cluster names)
 SKIP_PC_APPLIANCE=true (Optional, defaults to false. Excludes the Prism Central appliance from the discovered cluster list)

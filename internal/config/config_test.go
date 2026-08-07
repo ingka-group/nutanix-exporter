@@ -118,6 +118,34 @@ func Test_NewConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("SDTargetAddress defaults to empty so the request Host is used", func(t *testing.T) {
+		t.Setenv("PC_CLUSTER_URL", "https://10.0.0.1:9440")
+		t.Setenv("PC_CLUSTER_NAME", "my-pc")
+		unsetenv(t, "EXPORTER_SD_TARGET")
+
+		cfg, err := NewConfig()
+		if err != nil {
+			t.Fatalf("NewConfig() unexpected error: %v", err)
+		}
+		if cfg.SDTargetAddress != "" {
+			t.Errorf("SDTargetAddress = %q, want empty", cfg.SDTargetAddress)
+		}
+	})
+
+	t.Run("SDTargetAddress is read from the environment", func(t *testing.T) {
+		t.Setenv("PC_CLUSTER_URL", "https://10.0.0.1:9440")
+		t.Setenv("PC_CLUSTER_NAME", "my-pc")
+		t.Setenv("EXPORTER_SD_TARGET", "nutanix-exporter:9408")
+
+		cfg, err := NewConfig()
+		if err != nil {
+			t.Fatalf("NewConfig() unexpected error: %v", err)
+		}
+		if cfg.SDTargetAddress != "nutanix-exporter:9408" {
+			t.Errorf("SDTargetAddress = %q, want %q", cfg.SDTargetAddress, "nutanix-exporter:9408")
+		}
+	})
+
 	t.Run("missing required var returns error", func(t *testing.T) {
 		unsetenv(t, "PC_CLUSTER_URL")
 		unsetenv(t, "PC_CLUSTER_NAME")
