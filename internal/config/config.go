@@ -26,6 +26,7 @@ type Config struct {
 	PrismCentralName       string        `env:"PC_CLUSTER_NAME,required"`
 	ClusterRefreshInterval time.Duration `env:"CLUSTER_REFRESH_INTERVAL" envDefault:"30m"`
 	ClusterPrefix          string        `env:"CLUSTER_PREFIX" envDefault:""`
+	SkipPCAppliance        bool          `env:"SKIP_PC_APPLIANCE" envDefault:"false"`
 	PCAPIVersion           string        `env:"PC_API_VERSION" envDefault:"v4"`
 	VaultAddress           string        `env:"VAULT_ADDR"`
 	VaultRoleId            string        `env:"VAULT_ROLE_ID"`

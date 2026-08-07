@@ -34,8 +34,12 @@ type Config struct {
 	PrismCentralName       string
 	ClusterRefreshInterval time.Duration
 	ClusterPrefix          string
-	PCAPIVersion           string
-	ConfigPath             string
+	// SkipPCAppliance excludes the Prism Central appliance from the discovered
+	// cluster list. PC does not serve the Prism Element v1/v2 APIs the collectors
+	// use, so it cannot be scraped by this exporter.
+	SkipPCAppliance bool
+	PCAPIVersion    string
+	ConfigPath      string
 }
 
 // CredentialProvider defines the interface for Nutanix credential management.
@@ -54,6 +58,7 @@ func NewExporterService(cfg *Config, credProvider CredentialProvider) *ExporterS
 		PrismCentralName:       cfg.PrismCentralName,
 		ClusterRefreshInterval: cfg.ClusterRefreshInterval,
 		ClusterPrefix:          cfg.ClusterPrefix,
+		SkipPCAppliance:        cfg.SkipPCAppliance,
 		PCAPIVersion:           cfg.PCAPIVersion,
 		ConfigPath:             cfg.ConfigPath,
 	}

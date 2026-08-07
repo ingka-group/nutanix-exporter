@@ -65,17 +65,40 @@ func NewCluster(name, rawURL string, ncp auth.CredentialProvider, isPC bool, ski
 	}
 }
 
+// prismCentralFunction is the cluster function reported by Prism Central for its
+// own appliance, in both the v3 service_list and the v4 clusterFunction fields.
+const prismCentralFunction = "PRISM_CENTRAL"
+
+// clusterInfo is a single cluster entry parsed from a Prism Central API response.
+type clusterInfo struct {
+	name string
+	ip   string
+	// isPC reports whether this entry is the Prism Central appliance itself
+	// rather than a Prism Element cluster.
+	isPC bool
+}
+
+// FetchOptions controls which clusters FetchClusters returns.
+type FetchOptions struct {
+	// APIVersion selects the PC API variant ("v3", "v4b1", or "v4" / anything else).
+	APIVersion string
+	// Prefix, when non-empty, filters out clusters whose names don't start with it.
+	Prefix string
+	// SkipPCAppliance, when true, filters out the Prism Central appliance itself.
+	// PC exposes only v3/v4 APIs, not the PE v1/v2 APIs the collectors use, so it
+	// cannot be scraped by this exporter.
+	SkipPCAppliance bool
+}
+
 // FetchClusters queries Prism Central via client and returns a map of cluster name -> URL.
-// apiVersion selects the PC API variant ("v3", "v4b1", or "v4" / anything else).
-// prefix, when non-empty, filters clusters whose names don't start with it.
-func FetchClusters(ctx context.Context, client NutanixClient, apiVersion, prefix string) (map[string]string, error) {
+func FetchClusters(ctx context.Context, client NutanixClient, opts FetchOptions) (map[string]string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	var makeRequest func(context.Context, int) (*http.Response, error)
-	var parseClusters func(map[string]any) ([]map[string]string, int, error)
+	var parseClusters func(map[string]any) ([]clusterInfo, int, error)
 
-	switch apiVersion {
+	switch opts.APIVersion {
 	case "v3":
 		makeRequest = func(ctx context.Context, page int) (*http.Response, error) {
 			return fetchClustersV3(ctx, client, page)
@@ -98,7 +121,7 @@ func FetchClusters(ctx context.Context, client NutanixClient, apiVersion, prefix
 	totalExpected := 0
 	totalFetched := 0
 
-	slog.Info("Fetching clusters", "api_version", apiVersion)
+	slog.Info("Fetching clusters", "api_version", opts.APIVersion, "skip_pc_appliance", opts.SkipPCAppliance)
 
 	for {
 		slog.Info("Fetching clusters page", "page", page)
@@ -134,11 +157,16 @@ func FetchClusters(ctx context.Context, client NutanixClient, apiVersion, prefix
 		pageClusterCount := 0
 		duplicateCount := 0
 		for _, cluster := range clusters {
-			name := cluster["name"]
-			ip := cluster["ip"]
+			name := cluster.name
+			ip := cluster.ip
 
-			if prefix != "" && !strings.HasPrefix(name, prefix) {
-				slog.Info("Skipping cluster due to prefix filter", "name", name, "prefix", prefix)
+			if opts.SkipPCAppliance && cluster.isPC {
+				slog.Info("Skipping Prism Central appliance", "name", name)
+				continue
+			}
+
+			if opts.Prefix != "" && !strings.HasPrefix(name, opts.Prefix) {
+				slog.Info("Skipping cluster due to prefix filter", "name", name, "prefix", opts.Prefix)
 				continue
 			}
 
@@ -220,7 +248,24 @@ func fetchClustersV4b1(ctx context.Context, client NutanixClient, page int) (*ht
 	})
 }
 
-func parseClustersV3(result map[string]any) ([]map[string]string, int, error) {
+// hasPrismCentralFunction reports whether a cluster function list marks the entry
+// as the Prism Central appliance. A missing or malformed list reads as false so an
+// unexpected response shape leaves the cluster in place rather than silently
+// dropping it.
+func hasPrismCentralFunction(functions any) bool {
+	list, ok := functions.([]any)
+	if !ok {
+		return false
+	}
+	for _, fn := range list {
+		if s, ok := fn.(string); ok && strings.EqualFold(s, prismCentralFunction) {
+			return true
+		}
+	}
+	return false
+}
+
+func parseClustersV3(result map[string]any) ([]clusterInfo, int, error) {
 	entities, ok := result["entities"].([]any)
 	if !ok {
 		return nil, 0, fmt.Errorf("unexpected v3 response format: missing 'entities' field")
@@ -236,7 +281,7 @@ func parseClustersV3(result map[string]any) ([]map[string]string, int, error) {
 	}
 	totalCount := int(totalMatches)
 
-	var clusters []map[string]string
+	var clusters []clusterInfo
 	unnamedCount := 0
 	for _, entity := range entities {
 		cluster, ok := entity.(map[string]any)
@@ -271,16 +316,23 @@ func parseClustersV3(result map[string]any) ([]map[string]string, int, error) {
 			continue
 		}
 
-		clusters = append(clusters, map[string]string{
-			"name": name,
-			"ip":   ip,
+		// v3 reports cluster functions under status.resources.config.service_list.
+		isPC := false
+		if config, ok := resources["config"].(map[string]any); ok {
+			isPC = hasPrismCentralFunction(config["service_list"])
+		}
+
+		clusters = append(clusters, clusterInfo{
+			name: name,
+			ip:   ip,
+			isPC: isPC,
 		})
 	}
 
 	return clusters, totalCount - unnamedCount, nil
 }
 
-func parseClustersV4(result map[string]any) ([]map[string]string, int, error) {
+func parseClustersV4(result map[string]any) ([]clusterInfo, int, error) {
 	data, ok := result["data"].([]any)
 	if !ok {
 		return nil, 0, fmt.Errorf("unexpected v4 response format: missing 'data' field")
@@ -296,7 +348,7 @@ func parseClustersV4(result map[string]any) ([]map[string]string, int, error) {
 	}
 	totalCount := int(totalAvailable)
 
-	var clusters []map[string]string
+	var clusters []clusterInfo
 	unnamedCount := 0
 	for _, item := range data {
 		clusterMap, ok := item.(map[string]any)
@@ -330,9 +382,16 @@ func parseClustersV4(result map[string]any) ([]map[string]string, int, error) {
 			continue
 		}
 
-		clusters = append(clusters, map[string]string{
-			"name": name,
-			"ip":   ip,
+		// v4 reports cluster functions under config.clusterFunction.
+		isPC := false
+		if config, ok := clusterMap["config"].(map[string]any); ok {
+			isPC = hasPrismCentralFunction(config["clusterFunction"])
+		}
+
+		clusters = append(clusters, clusterInfo{
+			name: name,
+			ip:   ip,
+			isPC: isPC,
 		})
 	}
 
