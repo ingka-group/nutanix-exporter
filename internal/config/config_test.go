@@ -76,6 +76,48 @@ func Test_NewConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("SkipPCAppliance defaults to false when unset", func(t *testing.T) {
+		t.Setenv("PC_CLUSTER_URL", "https://10.0.0.1:9440")
+		t.Setenv("PC_CLUSTER_NAME", "my-pc")
+		unsetenv(t, "SKIP_PC_APPLIANCE")
+
+		cfg, err := NewConfig()
+		if err != nil {
+			t.Fatalf("NewConfig() unexpected error: %v", err)
+		}
+		if cfg.SkipPCAppliance {
+			t.Error("SkipPCAppliance = true, want false so existing deployments keep scraping the PC appliance")
+		}
+	})
+
+	t.Run("SkipPCAppliance is opt in", func(t *testing.T) {
+		tests := []struct {
+			value string
+			want  bool
+		}{
+			{value: "true", want: true},
+			{value: "1", want: true},
+			{value: "false", want: false},
+			{value: "0", want: false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.value, func(t *testing.T) {
+				t.Setenv("PC_CLUSTER_URL", "https://10.0.0.1:9440")
+				t.Setenv("PC_CLUSTER_NAME", "my-pc")
+				t.Setenv("SKIP_PC_APPLIANCE", tt.value)
+
+				cfg, err := NewConfig()
+				if err != nil {
+					t.Fatalf("NewConfig() unexpected error: %v", err)
+				}
+				if cfg.SkipPCAppliance != tt.want {
+					t.Errorf("SKIP_PC_APPLIANCE=%q gave SkipPCAppliance = %v, want %v", tt.value, cfg.SkipPCAppliance, tt.want)
+				}
+			})
+		}
+	})
+
 	t.Run("missing required var returns error", func(t *testing.T) {
 		unsetenv(t, "PC_CLUSTER_URL")
 		unsetenv(t, "PC_CLUSTER_NAME")

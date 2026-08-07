@@ -172,7 +172,11 @@ func (es *ExporterService) startRefreshRoutines(ctx context.Context) {
 }
 
 func (es *ExporterService) refreshClusters(ctx context.Context) error {
-	clusterData, err := nutanix.FetchClusters(ctx, es.pcCluster.API, es.config.PCAPIVersion, es.config.ClusterPrefix)
+	clusterData, err := nutanix.FetchClusters(ctx, es.pcCluster.API, nutanix.FetchOptions{
+		APIVersion:      es.config.PCAPIVersion,
+		Prefix:          es.config.ClusterPrefix,
+		SkipPCAppliance: es.config.SkipPCAppliance,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to fetch clusters: %w", err)
 	}

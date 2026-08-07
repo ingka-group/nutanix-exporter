@@ -13,6 +13,7 @@ The Nutanix Exporter is a Go application that fetches live data from any number 
 - Parent Exporter class that can be extended for any APIv2 endpoint
 - Per cluster metrics exposed at `/metrics/cluster-name`
 - Optional filtering by cluster name prefix
+- Optional exclusion of the Prism Central appliance from the discovered cluster list
 - TLS encryption and HTTP basic authentication via [exporter-toolkit web configuration](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md)
 
 ## Getting Started
@@ -39,6 +40,19 @@ The Nutanix Exporter is a Go application that fetches live data from any number 
     - `PE_PASSWORD_CLUSTER_NAME`
 
     **Note:** consecutive non-alphanumeric characters are collapsed into a single underscore. For example, `cluster--name` and `cluster-name` both map to `PE_USERNAME_CLUSTER_NAME`.
+
+### Cluster Discovery
+
+The exporter discovers clusters by querying Prism Central, then scrapes each one through the Prism Element APIs. Prism Central lists its own appliance alongside the Prism Element clusters it manages, and that entry is included by default.
+
+The PC appliance does not serve the Prism Element v1/v2 APIs the collectors depend on, so it cannot produce metrics. If you do not hold credentials for it, every discovery cycle logs a credential failure for it:
+
+```text
+level=ERROR msg="Failed to get credentials" kind="Prism Element" name=ProdCentral-NXP000
+level=WARN msg="Failed to initialize cluster" name=ProdCentral-NXP000
+```
+
+Set `SKIP_PC_APPLIANCE=true` to exclude it. The appliance is identified by the cluster function Prism Central reports for it (`clusterFunction` on v4, `service_list` on v3), not by name. The default is `false` to preserve existing behaviour; if a response omits that field the cluster is kept rather than dropped.
 
 ### Metrics Configuration
 
@@ -103,6 +117,7 @@ PC_API_VERSION=v3 (Optional, defaults to v4. Supports v3, v4b1, v4)
 EXPORTER_LISTEN_ADDRESS=:9408 (Optional, defaults to :9408. Address and port the exporter listens on)
 CLUSTER_REFRESH_INTERVAL=1800 (Optional, defaults to 30 minutes, value is in seconds)
 CLUSTER_PREFIX=optional-cluster-prefix (Optional, prefix to filter cluster names)
+SKIP_PC_APPLIANCE=true (Optional, defaults to false. Excludes the Prism Central appliance from the discovered cluster list)
 CONFIG_PATH=/etc/prometheus-nutanix-exporter/ (Optional, defaults to `./configs`)
 
 ### For HashiCorp Vault only
