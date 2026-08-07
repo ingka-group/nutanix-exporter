@@ -34,8 +34,11 @@ jobs:
         major_pattern: "(MAJOR)"
         minor_pattern: "(MINOR)"
         version_format: "${major}.${minor}.${patch}"
+        # Every commit bumps at least the patch version. Without this, a merge
+        # commit carrying no (MAJOR)/(MINOR)/(PATCH) tag produces no bump at
+        # all, and the release re-publishes over the previous version and moves
+        # the 'latest' Docker tag onto it.
         bump_each_commit: true
-        bump_each_commit_patch_pattern: "(PATCH)"
 
     - name: Set up Artifactory CLI
       uses: jfrog/setup-jfrog-cli@86dacb6974c66cc99e7651e1205f6581aaddba9a

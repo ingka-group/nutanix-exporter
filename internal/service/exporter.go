@@ -41,6 +41,9 @@ type clusterEntry struct {
 	registry *prometheus.Registry
 }
 
+// ExporterService owns the discovered clusters and the HTTP surface that serves
+// their metrics. clustersMap is replaced wholesale on refresh and guarded by
+// clustersMu, so readers always see a complete cluster list.
 type ExporterService struct {
 	config             *config.Config
 	credentialProvider auth.CredentialProvider
@@ -50,6 +53,8 @@ type ExporterService struct {
 	pcCluster          *nutanix.Cluster
 }
 
+// NewExporterService returns an ExporterService with no clusters. Clusters are
+// discovered from Prism Central when the service is started.
 func NewExporterService(cfg *config.Config, credProvider auth.CredentialProvider) *ExporterService {
 	return &ExporterService{
 		config:             cfg,
@@ -58,10 +63,15 @@ func NewExporterService(cfg *config.Config, credProvider auth.CredentialProvider
 	}
 }
 
+// Start initializes the exporter and serves it over the built-in HTTP server.
 func (es *ExporterService) Start(ctx context.Context, webFlags *web.FlagConfig) error {
 	return es.StartWithServer(ctx, webFlags)
 }
 
+// StartWithServer connects to Prism Central, performs the first cluster
+// discovery and starts the background refresh routines. When webFlags is
+// non-nil the built-in HTTP server is started; pass nil when embedding the
+// exporter behind another server.
 func (es *ExporterService) StartWithServer(ctx context.Context, webFlags *web.FlagConfig) error {
 	if err := es.initializePrismCentral(); err != nil {
 		return fmt.Errorf("failed to initialize Prism Central: %w", err)
@@ -112,6 +122,9 @@ func (es *ExporterService) GetServiceDiscoveryHandler() http.Handler {
 	return http.HandlerFunc(es.serviceDiscoveryHandler)
 }
 
+// Stop gracefully shuts down the built-in HTTP server, waiting up to five
+// seconds for in-flight scrapes to finish. It is a no-op when the server was
+// never started.
 func (es *ExporterService) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
