@@ -86,6 +86,8 @@ func (es *ExporterService) StartWithServer(ctx context.Context, webFlags *web.Fl
 	return nil
 }
 
+// GetHandler returns a handler serving every cluster's metrics in one combined
+// scrape. See README on cluster discovery for preferred per-cluster scraping on large deployments.
 func (es *ExporterService) GetHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		es.clustersMu.RLock()
@@ -96,6 +98,18 @@ func (es *ExporterService) GetHandler() http.Handler {
 		es.clustersMu.RUnlock()
 		promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{}).ServeHTTP(w, r)
 	})
+}
+
+// GetMetricsHandler returns a handler serving a single cluster's metrics, chosen
+// by the path segment after "/metrics/". It must be mounted on that prefix.
+func (es *ExporterService) GetMetricsHandler() http.Handler {
+	return http.HandlerFunc(es.metricsHandler)
+}
+
+// GetServiceDiscoveryHandler returns a handler serving the discovered clusters
+// as Prometheus http_sd target groups, one target per cluster.
+func (es *ExporterService) GetServiceDiscoveryHandler() http.Handler {
+	return http.HandlerFunc(es.serviceDiscoveryHandler)
 }
 
 func (es *ExporterService) Stop() error {
@@ -246,6 +260,7 @@ func (es *ExporterService) setupHTTPHandlers() {
 
 	mux.HandleFunc("/", es.indexHandler)
 	mux.HandleFunc("/metrics/", es.metricsHandler)
+	mux.HandleFunc("/sd", es.serviceDiscoveryHandler)
 
 	es.server = &http.Server{
 		Handler:      mux,
@@ -256,7 +271,7 @@ func (es *ExporterService) setupHTTPHandlers() {
 }
 
 func (es *ExporterService) indexHandler(w http.ResponseWriter, r *http.Request) {
-	_, _ = fmt.Fprint(w, `<html><head><title>Nutanix Exporter</title></head><body><h1>Nutanix Exporter</h1><p><a href="/metrics">Metrics</a></p></body></html>`)
+	_, _ = fmt.Fprint(w, `<html><head><title>Nutanix Exporter</title></head><body><h1>Nutanix Exporter</h1><p><a href="/metrics">Metrics</a></p><p><a href="/sd">Service Discovery</a></p></body></html>`)
 }
 
 func (es *ExporterService) metricsHandler(w http.ResponseWriter, r *http.Request) {

@@ -57,6 +57,37 @@ func Test_Stop_noServer(t *testing.T) {
 	}
 }
 
+func Test_GetServiceDiscoveryHandler_respondsWithJSON(t *testing.T) {
+	es := newTestExporterService()
+
+	req := httptest.NewRequest(http.MethodGet, "/sd", nil)
+	w := httptest.NewRecorder()
+	es.GetServiceDiscoveryHandler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("GetServiceDiscoveryHandler response = %d, want 200", w.Code)
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Content-Type = %q, want %q", ct, "application/json")
+	}
+	// No clusters discovered, so an empty array rather than null.
+	if got := w.Body.String(); got != "[]\n" {
+		t.Errorf("body = %q, want %q", got, "[]\n")
+	}
+}
+
+func Test_GetMetricsHandler_unknownClusterIs404(t *testing.T) {
+	es := newTestExporterService()
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics/nonexistent", nil)
+	w := httptest.NewRecorder()
+	es.GetMetricsHandler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("GetMetricsHandler unknown cluster = %d, want 404", w.Code)
+	}
+}
+
 func Test_GetHandler_returnsHandler(t *testing.T) {
 	es := newTestExporterService()
 	h := es.GetHandler()

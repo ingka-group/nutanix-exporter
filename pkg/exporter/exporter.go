@@ -34,12 +34,10 @@ type Config struct {
 	PrismCentralName       string
 	ClusterRefreshInterval time.Duration
 	ClusterPrefix          string
-	// SkipPCAppliance excludes the Prism Central appliance from the discovered
-	// cluster list. PC does not serve the Prism Element v1/v2 APIs the collectors
-	// use, so it cannot be scraped by this exporter.
-	SkipPCAppliance bool
-	PCAPIVersion    string
-	ConfigPath      string
+	SkipPCAppliance        bool
+	PCAPIVersion           string
+	ConfigPath             string
+	SDTargetAddress        string
 }
 
 // CredentialProvider defines the interface for Nutanix credential management.
@@ -61,6 +59,7 @@ func NewExporterService(cfg *Config, credProvider CredentialProvider) *ExporterS
 		SkipPCAppliance:        cfg.SkipPCAppliance,
 		PCAPIVersion:           cfg.PCAPIVersion,
 		ConfigPath:             cfg.ConfigPath,
+		SDTargetAddress:        cfg.SDTargetAddress,
 	}
 	return &ExporterService{svc: service.NewExporterService(internalCfg, credProvider)}
 }
@@ -73,9 +72,24 @@ func (es *ExporterService) StartWithServer(ctx context.Context, webFlags *web.Fl
 }
 
 // GetHandler returns an http.Handler that serves combined Prometheus metrics
-// from all discovered Nutanix clusters.
+// from all discovered Nutanix clusters. See the README on cluster discovery for
+// why per-cluster scraping is preferred at fleet scale.
 func (es *ExporterService) GetHandler() http.Handler {
 	return es.svc.GetHandler()
+}
+
+// GetMetricsHandler returns an http.Handler serving a single cluster's metrics,
+// chosen by the path segment after "/metrics/". It must be mounted on that
+// prefix, and pairs with GetServiceDiscoveryHandler to give Prometheus one
+// target per cluster.
+func (es *ExporterService) GetMetricsHandler() http.Handler {
+	return es.svc.GetMetricsHandler()
+}
+
+// GetServiceDiscoveryHandler returns an http.Handler serving the discovered
+// clusters as Prometheus http_sd target groups, for use with http_sd_config.
+func (es *ExporterService) GetServiceDiscoveryHandler() http.Handler {
+	return es.svc.GetServiceDiscoveryHandler()
 }
 
 // Stop shuts down the exporter service gracefully.
