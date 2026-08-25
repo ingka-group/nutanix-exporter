@@ -93,6 +93,8 @@ By default each target is advertised using the `Host` of the discovery request. 
 
 `refresh_interval` controls only how often Prometheus re-reads `/sd`. The list behind it is refreshed by the exporter on `CLUSTER_REFRESH_INTERVAL` (default 30 minutes), so a shorter `refresh_interval` re-reads the same data and a newly added cluster will not appear until the exporter's own refresh runs. Keep `refresh_interval` at or above `CLUSTER_REFRESH_INTERVAL` unless you have a reason to poll more often.
 
+The same refresh rebuilds every collector, which re-reads the metric definitions under `CONFIG_PATH`. Edits to `cluster.yaml`, `host.yaml`, `storage_container.yaml`, `vm.yaml` and `vm_v1.yaml` therefore apply on the next refresh without a restart, as long as the files are visible in the running container.
+
 #### Cluster names in paths
 
 Cluster names are URL-escaped when building `__metrics_path__`, so names containing spaces or other characters that are not URL-safe still resolve correctly. Names remain easiest to work with when limited to letters, numbers, dots, dashes and underscores, since they also appear in the `cluster_name` metric label and in the `PE_USERNAME_<CLUSTERNAME>` environment variables described above.

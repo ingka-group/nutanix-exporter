@@ -198,6 +198,8 @@ func (es *ExporterService) startRefreshRoutines(ctx context.Context) {
 	}
 }
 
+// refreshClusters rebuilds every collector,also re-reading the metric
+// definitions under CONFIG_PATH. Config edits apply here without a restart.
 func (es *ExporterService) refreshClusters(ctx context.Context) error {
 	clusterData, err := nutanix.FetchClusters(ctx, es.pcCluster.API, nutanix.FetchOptions{
 		APIVersion:      es.config.PCAPIVersion,
