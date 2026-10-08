@@ -80,7 +80,7 @@ jobs:
       run: |
         IMAGE_NAME="nutanix_exporter"
         VERSION="${{ steps.create_version.outputs.version }}"
-        ARTIFACTORY_URL="${{ secrets.JF_URL }}/${{ secrets.JF_DOCKER_PROD_REPO }}/nutanix"
+        ARTIFACTORY_URL="${{ secrets.JF_URL }}/${{ secrets.JF_DOCKER_PROD_REPO }}/ingka"
         FULL_IMAGE_NAME="$ARTIFACTORY_URL/${IMAGE_NAME}"
 
         # Tag the image with the specific version and 'latest'
